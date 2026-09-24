@@ -158,7 +158,8 @@ class App:
         """The account and dictionary pages ask for their data when opened."""
         getter = {"account": "account_for_ui",
                   "dictionary": "dictionary_for_ui",
-                  "intensive": "intensive_for_ui"}.get(request.match_info["page"])
+                  "intensive": "intensive_for_ui",
+                  "catalog": "catalog_for_ui"}.get(request.match_info["page"])
         fn = plugin_fn(getter) if getter else None
         if fn is None:
             return web.json_response({"error": "not available"}, status=404)
@@ -264,6 +265,9 @@ class App:
                         print(f"[Web] bad message: {e}")
         finally:
             self.ui.remove_client(ws)
+            # No page is open any more (closed, or reloading): the teacher stops.
+            if not self.ui.has_clients():
+                self._stop_session()
         return ws
 
     def _on_message(self, data: dict) -> None:

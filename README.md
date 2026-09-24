@@ -1,20 +1,18 @@
-# LangVis
+<p align="center"><img src="docs/logo.png" alt="langvis.ai" width="320"></p>
 
 **A speaking language teacher in your browser.**
-LangVis talks with you by voice, checks every sentence before it answers,
-corrects you, shows you a richer way to say it and makes you say it again.
-It teaches like a real teacher: first the words, then the grammar, then a
-dialogue, and only then free conversation.
+LangVis talks with you by voice and checks every sentence before it answers.
+It has two sides: **Courses**, where a teacher takes you through fixed course
+material step by step, and the **Tutor**, where you talk freely about anything
+and ask about any grammar or word.
 
-
-![A lesson on the board](docs/screenshots/03-course-words.png)
+![A course lesson on the board](docs/screenshots/03-course-words.png)
 
 | | |
 |---|---|
-| **Languages** | English (A2 → B2) · Slovak (A1 → B1) |
-| **Two ways to learn** | **Lessons** - topics and free talk · **Courses** - a fixed course from zero |
+| **Languages** | English · Slovak - switched in the header, each with its own level and progress |
 | **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · English A2 → B1 sentence builder (20 lessons, 4 weeks) |
-| **Topics** | 13 ready topics + your own, each with its own dictionary and a taught first lesson |
+| **Tutor** | free conversation: 13 topics + your own, or free talk; grammar on the board whenever you ask |
 | **Voice** | real-time two-way audio through the Gemini Live API |
 | **Platform** | Python server + any modern browser · Windows, macOS, Linux |
 
@@ -23,12 +21,12 @@ dialogue, and only then free conversation.
 ## Contents
 
 - [Quick start](#quick-start)
-- [Two ways to learn](#two-ways-to-learn)
-- [Lessons - topics and free talk](#lessons---topics-and-free-talk)
+- [Courses and Tutor](#courses-and-tutor)
+- [Tutor - free conversation](#tutor---free-conversation)
 - [Courses - learning from zero](#courses---learning-from-zero)
 - [How one sentence is checked](#how-one-sentence-is-checked)
 - [Hearing a beginner](#hearing-a-beginner)
-- [Dictionary and Account](#dictionary-and-account)
+- [Account, Dictionary and Grammar](#account-dictionary-and-grammar)
 - [Languages and explanations](#languages-and-explanations)
 - [What is saved](#what-is-saved)
 - [Project structure](#project-structure)
@@ -53,88 +51,64 @@ starts only the server).
 
 1. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
    page asks for it.
-2. Open **⚙ Settings**: the language to learn, your own language, the pace
-   and how strictly to correct.
-3. Pick the language in the header (🌐 English or Slovak). Start a course
-   lesson on **Courses**, or open the **Classroom**, pick a topic and press
-   **Start**. Allow the microphone, and talk.
+2. Open **⚙ Settings**: your own language, the pace and how strictly to correct.
+3. Pick the language in the header (🌐 English or Slovak). Continue your course
+   on **Courses**, or open the **Tutor**, pick a topic and press **Start**.
+   Allow the microphone, and talk.
 
 ---
 
-## Two ways to learn
+## Courses and Tutor
 
-Everything is switched from the header: the **language** you learn (🌐), the
-**topic** of a lesson, and the pages - **Courses** (the home page),
-**Classroom**, **Dictionary** and **Account**.
+The header holds everything: the logo (home), the **language** you learn (🌐),
+and the pages - **Courses** (the home page), **Tutor** and **Account**. The
+**topic** select appears only on the Tutor page.
 
-![The language pick in the header](docs/screenshots/01-language.png)
+![The header and the language pick](docs/screenshots/01-language.png)
 
-| | **Lessons** | **Courses** |
+| | **Courses** | **Tutor** |
 |---|---|---|
-| For | practising a language you already speak a little | starting a language from zero |
-| What leads | the topic you pick | the course material, lesson by lesson |
-| Order | free: any grammar, any time | fixed: every lesson builds on the last |
-| Left of the board | - | the course syllabus, always open |
-| Right of the board | the topic's words | this lesson's words and words to review |
+| For | learning step by step, from zero | practising freely |
+| What leads | the course material, lesson by lesson | you - any topic, any question |
+| Rules | strict: every step is taught and repeated | none: gentle guidance, no forced repeats |
+| Left of the board | the course syllabus, always open | - |
+| Right of the board | this lesson's words and words to review | the topic's words |
 
-**Start / Continue the lesson** on the Courses page (or a finished lesson's
-tile) opens the Classroom in the course. Choosing a **topic** in the header
-takes you back to the topic lessons.
+**Nothing starts by itself.** The board waits with a **Start** button and the
+teacher begins only when you press it. **Continue the lesson** on the Courses
+page is a Start too. Leaving the page, choosing another topic, language or
+course lesson, or losing the connection stops the lesson until you press
+**Start** again.
 
-Nothing starts by itself. The Classroom waits with a **Start** button, and the
-teacher begins only when you press it. Leaving the Classroom, choosing another
-topic, language or course lesson, or losing the connection stops the lesson;
-it waits for **Start** again.
+![The board before Start](docs/screenshots/00-start.png)
 
-![The Classroom before Start](docs/screenshots/00-start.png)
-
-The **language select** in the header (🌐 `Slovak · A1`, `English · B1`)
-switches the language you are learning. Each language keeps its own level,
-course position, words and history, so the header, the board and every page
-change to that language's progress at once.
+The **language select** in the header (🌐 `English`, `Slovak`)
+switches the language you are learning. The page reloads and everything - the
+level, the courses, the words, the history - is that language's.
 
 ---
 
-## Lessons - topics and free talk
+## Tutor - free conversation
 
-Pick a topic in the header: Daily life, Work, Home, Food, Shopping and money,
+The Tutor is a friendly conversation partner, not a drill. Talk about anything,
+pick a topic in the header (Daily life, Work, Home, Food, Shopping and money,
 Travel, Health, Free time, Family and friends, Technology, City and transport,
-Education, Opinions and society - or **your own** (a coffee shop, football,
-a job interview...). Free talk has no topic at all.
+Education, Opinions and society, or **your own** - a coffee shop, football,
+a job interview...), or stay in free talk. Ask for a grammar rule, a word, a
+role play or a quick exercise at any moment.
 
-### The first lesson in a topic
+The Tutor helps with **guidance, not rules**:
 
-A new topic does not start with a question you cannot answer yet. The teacher
-first gives you the material, step by step, and you repeat each part:
+- A mistake is corrected **once**, kindly ("We'd say: ..."), and the talk goes
+  on - you do not have to repeat it. The board shows the mistakes in red, the
+  corrected sentence and why.
+- Now and then it offers **one more natural way** to say it ("You could also
+  say: ..."), shown on the board with each new word explained and translated.
+- It keeps you speaking: an answer, then a follow-up question about what you said.
 
-1. **Words and word partners** - taken from the topic's own dictionary
-2. **Linking words** - and, but, then, because
-3. **Grammar** - the rule of your current unit, shown on this topic
-4. **Longer sentences** - how one short sentence grows: + where, + why
-5. **A dialogue** - line by line, the teacher plays the other person
-6. **Your own sentences** - you finish sentence frames about your life
+![A correction in the Tutor](docs/screenshots/07-topic-correction.png)
 
-![Making a sentence longer](docs/screenshots/10-topic-lesson.png)
-
-Only then does the conversation start. The teacher's job there is to keep you
-talking: open questions, "why?", "tell me more", and "make it longer with a
-linking word".
-
-### Corrections
-
-A sentence with a mistake is corrected **before** the teacher answers it. The
-mistakes are red and numbered, each with its grammar and a one-line reason,
-and the teacher walks to the word it explains. You say the right sentence,
-and only then does the conversation go on.
-
-![A correction](docs/screenshots/07-topic-correction.png)
-
-### Say it better
-
-A correct sentence is lifted one level up: a stronger word, a collocation or
-a phrasal verb, each explained and translated. You say the better version too.
-
-![The better version](docs/screenshots/08-topic-better.png)
+![A better way to say it](docs/screenshots/08-topic-better.png)
 
 ### Grammar on the board
 
@@ -144,7 +118,15 @@ columns, blocks), your own mistake and examples. Then three practice questions.
 
 ![Grammar on the board](docs/screenshots/09-grammar-board.png)
 
-### The English course inside every topic
+### A topic taught step by step - when you ask
+
+Say "teach me this topic" and the Tutor gives the topic's material step by
+step: its words and word partners, linking words, a grammar point, how to make
+a sentence longer, a model dialogue and sentence frames.
+
+![Making a sentence longer](docs/screenshots/10-topic-lesson.png)
+
+### The English grammar ladder behind the Tutor
 
 | Stage | Title | Units |
 |---|---|---|
@@ -155,8 +137,8 @@ columns, blocks), your own mistake and examples. Then three practice questions.
 | **B2.1** | Precision in the past | Past perfect · Third conditional & wishes · Reported speech · Modals of deduction |
 | **B2.2** | Range and control | Advanced passive · Future continuous & perfect · Discourse markers · Collocations |
 
-Every topic climbs the whole course on its own; the questions grow up with the
-grammar. Grammar belongs to you, not to a topic, so later topics climb faster.
+Your level and grammar are measured from everything you say, and the Tutor
+speaks at your level with words one step above it.
 
 ---
 
@@ -251,6 +233,8 @@ you speak ──▶ thinking ──▶ a mistake?  "Did you mean: …? Say it." 
                            "Good." + an answer + the next question
 ```
 
+- In a **course** a mistake and a better version are repeated; in the **Tutor**
+  they are only said once and the talk goes on.
 - A repeat is checked by the system, not by the model: it must match the
   sentence and contain the part that matters.
 - A repeat is asked for at most twice, then the lesson moves on. **Skip**
@@ -281,7 +265,11 @@ Beginner speech is slow and has an accent, so LangVis helps the listening side:
 
 ---
 
-## Dictionary and Account
+## Account, Dictionary and Grammar
+
+**Account** shows your level over time, dictionary growth, mistakes per day,
+where the mistakes are and every correction ever made. Two buttons at the top
+right open its other pages: **Dictionary** and **Grammar**.
 
 ### Dictionary
 
@@ -297,11 +285,14 @@ is kept for good, with how often and on how many **different days** you used it.
 | learned | used on 3+ different days | after 7 or 14 days |
 | strong | used on 5+ different days | every 30 days, forever |
 
-### Account
+### Grammar
 
-Your level over time, dictionary growth, mistakes per day and where the
-mistakes are, the grammar syllabus with your mastery of every rule, how far
-every topic has come, and every correction ever made.
+Every grammar rule from A1 to B2 with how well you know it, measured from what
+you say. Click a rule to see its explanation and your own mistakes.
+
+![Grammar](docs/screenshots/14-grammar.png)
+
+### Account
 
 ![Account](docs/screenshots/12-account.png)
 
@@ -346,7 +337,7 @@ web/
     index.html · app.css
     app.js                  socket, header, pages, chooser, settings
     board.js                the board and the tutor's walk across it
-    pages.js                Courses, Dictionary and Account pages, the course syllabus
+    pages.js                Courses, Account, Dictionary and Grammar pages, the course syllabus
     tutor.js · diagrams.js  the LangVis face and the grammar pictures
     audio.js · mic-worklet.js
 
@@ -367,7 +358,7 @@ tutor/
 plugins/
   language_tutor.py         the teacher: taught steps, courses, correct → enrich → record
 
-docs/screenshots/           the pictures in this file
+docs/                       logo.png and screenshots/ - the pictures in this file
 memory/ · config/           settings, memory and your local API key
 ```
 

@@ -2,13 +2,16 @@
 import { Audio } from "/static/audio.js";
 import { TutorFace, TutorWalker } from "/static/tutor.js";
 import { Board } from "/static/board.js";
-import { loadAccount, loadDictionary, loadIntensive, renderCourseSide } from "/static/pages.js";
+import { loadAccount, loadDictionary, loadGrammar, loadHome, loadIntensive, renderCourseSide,
+         renderLanguageChoice } from "/static/pages.js";
 
 const $ = (id) => document.getElementById(id);
 const audio = new Audio();
 let ws = null;
 let started = false;
 let startWith = {};   // a course or course lesson that goes with the next Start
+let startedOn = "";   // the page the lesson was started on
+let lastPage = "";    // the page shown before this one
 let freshStart = false;
 let tutorTurnOpen = false;  // the tutor is in the middle of a turn     // the first "start" of this page opens a new lesson
 let muted = false;
@@ -148,11 +151,10 @@ function renderStatus(s) {
   lvl.append(b, ` · ${s.score}/100 → ${s.goal}`);
   document.body.dataset.track = s.track || "normal";
   const it = s.intensive;
-  $("chip-intensive").textContent = it ? `Course · lesson ${it.lesson}/${it.total} · ${it.band}` : "Course";
   renderLanguages(s);
   if (it) renderCourseSide(it, act);
   const g = s.grammar || {};
-  $("chip-unit").textContent = g.total ? `Grammar · ${g.strong}/${g.total} known · ${g.weak} weak` : "Grammar";
+  $("unit-name").textContent = g.total ? `Grammar · ${g.strong}/${g.total} known · ${g.weak} weak` : "Grammar";
   renderTopics(s);
 
   if (!s.lexicon_ready) {
@@ -166,9 +168,11 @@ function renderStatus(s) {
 function renderLanguages(s) {
   const modes = (s.modes || []).filter((m) => m.enabled);
   const active = modes.find((m) => m.active);
-  if (active) $("lang-name").textContent = active.level ? `${active.name} · ${active.level}` : active.name;
+  // The new language is on: reload, so every page starts in it.
+  if (switchingTo && active && active.name === switchingTo) { location.reload(); return; }
+  if (active) $("lang-name").textContent = active.name;
   const menu = $("lang-menu");
-  const sig = JSON.stringify(modes.map((m) => [m.name, m.level, m.active]));
+  const sig = JSON.stringify(modes.map((m) => [m.name, m.active]));
   if (menu.dataset.sig === sig) return;
   menu.dataset.sig = sig;
   menu.textContent = "";
@@ -185,10 +189,7 @@ function renderLanguages(s) {
     b.className = "dropdown-item" + (m.active ? " active" : "");
     const name = document.createElement("span");
     name.textContent = m.name;
-    const lvl = document.createElement("span");
-    lvl.className = "az";
-    lvl.textContent = m.level ? `${m.level} · ${m.score}/100` : "";
-    b.append(name, lvl);
+    b.append(name);
     b.addEventListener("click", () => { if (!m.active) switchLanguage(m.name); });
     item.append(b);
     menu.append(item);
@@ -199,8 +200,10 @@ function switchLanguage(name) {
   send({ type: "language", value: name });
   $("lang-name").textContent = `${name}…`;
   flash(`Switching to ${name}…`);
-  if (document.body.dataset.page === "courses") setTimeout(() => loadIntensive(act), 900);
+  switchingTo = name;
+  setTimeout(() => location.reload(), 4000);   // in case the new status is slow
 }
+let switchingTo = "";
 
 // The topic dropdown (Bootstrap): started topics first, then the rest, then
 // "your own".
@@ -697,22 +700,55 @@ function addLog(text) {
 // ── Pages ───────────────────────────────────────────────────────────────────
 
 function route() {
-  // Courses is the home page.
-  let page = (location.hash.replace(/^#\/?/, "") || "courses").split("?")[0];
+  // Home is the start page. A course lesson and the Tutor share the board.
+  let page = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0];
   if (page === "intensive") page = "courses";
-  const known = ["lesson", "courses", "dictionary", "account"].includes(page) ? page : "courses";
+  const pages = ["home", "lesson", "tutor", "courses", "dictionary", "grammar", "account"];
+  const known = pages.includes(page) ? page : "home";
+  // The Tutor is a page of its own: going in or out of it loads the page afresh.
+  if (lastPage && (lastPage === "tutor") !== (known === "tutor")) {
+    if (started) send({ type: "stop" });
+    location.reload();
+    return;
+  }
+  lastPage = known;
+  const view = known === "tutor" ? "lesson" : known;
+  const tab = { lesson: "courses", dictionary: "account", grammar: "account" }[known] || known;
   document.body.dataset.page = known;
-  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("hidden", p.id !== `page-${known}`));
-  document.querySelectorAll(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === known));
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("hidden", p.id !== `page-${view}`));
+  document.querySelectorAll(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === tab));
   // Nothing starts by itself: the teacher begins when Start is pressed, and
-  // stops when the Classroom is left.
-  if (known !== "lesson" && started) { send({ type: "stop" }); stopped(); }
+  // stops when its page is left (a course lesson and the Tutor are two places).
+  if (started && known !== startedOn) { send({ type: "stop" }); stopped(); }
+  $("start-what").textContent = known === "tutor"
+    ? "Free conversation: talk about anything, ask about any grammar or word. Press Start and your tutor begins."
+    : "Your course lesson, step by step. Press Start and the teacher begins.";
   if (known === "courses") loadIntensive(act);
+  if (known === "home") loadHome(openCourse);
   if (known === "dictionary") loadDictionary();
+  if (known === "grammar") loadGrammar();
   if (known === "account") loadAccount();
-  if (known === "lesson") requestAnimationFrame(() => walker.reflow());
+  if (view === "lesson") requestAnimationFrame(() => walker.reflow());
 }
 window.addEventListener("hashchange", route);
+
+// "Start learning a new language": which language, then its courses.
+function openCourse(name, key) {
+  $("lang-overlay").classList.add("hidden");
+  const active = ((status.modes || []).find((m) => m.active) || {}).key;
+  if (key === active) { goTo("courses"); return; }
+  location.hash = "#/courses";       // the reload after the switch lands on Courses
+  switchLanguage(name);
+}
+function askLanguage() {
+  renderLanguageChoice(openCourse);
+  $("lang-overlay").classList.remove("hidden");
+}
+["home-start", "home-start-2"].forEach((id) => $(id).addEventListener("click", askLanguage));
+$("lang-cancel").addEventListener("click", () => $("lang-overlay").classList.add("hidden"));
+$("lang-overlay").addEventListener("click", (e) => {
+  if (e.target === $("lang-overlay")) $("lang-overlay").classList.add("hidden");
+});
 
 function goTo(page) {
   if (location.hash === `#/${page}`) route();
@@ -869,6 +905,11 @@ function go() {
   if (started) return;
   started = true;
   beginning = false;
+  startedOn = document.body.dataset.page;
+  // The page decides the kind of lesson: the Tutor is free talk, a lesson is the course.
+  if (!startWith.track && startWith.lesson === undefined) {
+    startWith = { track: startedOn === "tutor" ? "normal" : "intensive" };
+  }
   $("start-gate").classList.add("hidden");
   $("speech-text").textContent = "Connecting - I will start talking in a moment.";
   // Start begins the lesson from nothing (with the course chosen, if any).

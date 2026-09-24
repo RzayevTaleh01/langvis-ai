@@ -455,6 +455,8 @@ def format_for_prompt() -> str:
     repeat_first = bool(_setting("correct_first", True))
 
     explain = _explain_in(level)
+    # A course is taught strictly, step by step; the Tutor is free conversation.
+    strict = _intensive_on()
     if explain != name and explain != native:
         speak_rule = (
             f"You are a personal {name} teacher and nothing else. The learner is a beginner "
@@ -490,11 +492,15 @@ def format_for_prompt() -> str:
         speak_rule,
         phrase_rule,
         "",
-        "YOU ARE THE TEACHER, NOT A CONVERSATION PARTNER. You lead: you GIVE the "
-        "learner the words, phrases and model sentences first, and only then ask them "
-        "to use them. Never ask them to say something they have not been given the "
-        f"{name} for. Every question you ask comes with a model answer or a sentence "
-        f"frame they can copy and change (\"{_p('for_example')} ...\").",
+        ("YOU ARE THE TEACHER, NOT A CONVERSATION PARTNER. You lead: you GIVE the "
+         "learner the words, phrases and model sentences first, and only then ask them "
+         "to use them. Never ask them to say something they have not been given the "
+         f"{name} for. Every question you ask comes with a model answer or a sentence "
+         f"frame they can copy and change (\"{_p('for_example')} ...\")." if strict else
+         "YOU ARE A FRIENDLY PERSONAL TUTOR AND A REAL CONVERSATION PARTNER. The learner "
+         "leads: talk about anything they want, answer their questions fully, explain any "
+         "grammar or word the moment they ask (on the board), play a role if they ask. You "
+         "help with gentle guidance - never with drills or repeats they did not ask for."),
         (f"Other language modes: {', '.join(other)}. " if other else "")
         + (f"{', '.join(disabled)} mode is not available yet - if they ask for it, "
            f"say it is coming soon and continue in {name}." if disabled else ""),
@@ -528,50 +534,68 @@ def format_for_prompt() -> str:
         "teach it on the board when they do. If they ask to change the topic, call "
         "language_tutor with action='set_topic'.",
         "",
-        "EVERY SENTENCE THE LEARNER SAYS GOES THROUGH THESE THREE STEPS, IN THIS ORDER.",
-        "The learner asked for exactly this and does not mind that it is slow:",
     ]
-    if repeat_first:
+    if not strict:
         lines += [
-            "  STEP 1 - MISTAKES. If the sentence has a mistake: \"Did you mean: I went "
-            "to the office yesterday?\", then explain WHY from the board (the rule is drawn "
-            "there) in two or three short sentences, then \"Now say it.\" STOP and wait. "
-            "Right → \"Good.\" Still wrong → say it once more, accept it, go on. No "
-            "mistake → skip this step with no comment at all.",
+            "HOW YOU HELP - guidance, not rules:",
+            "- A mistake: say the right version once, in a friendly way (\"We'd say: ...\"), "
+            "then answer what they said and carry on. Do NOT make them repeat it, unless they "
+            "ask to practise.",
+            "- Now and then (not every turn) offer one more natural way to say it, in a few "
+            "words: \"You could also say: ...\".",
+            "- Keep the talk going: answer, then one follow-up question about what they said.",
+            "- They may ask for anything - a grammar rule, a word, how to say something, a role "
+            "play, a quick exercise. Do it at once, then go back to talking.",
+            "",
         ]
     else:
         lines += [
-            "  STEP 1 - MISTAKES. If the sentence has a mistake, say the right version "
-            "once (\"You mean: …\") without asking them to repeat it. No mistake → "
-            "skip this step with no comment at all.",
+            "EVERY SENTENCE THE LEARNER SAYS GOES THROUGH THESE THREE STEPS, IN THIS ORDER.",
+            "The learner asked for exactly this and does not mind that it is slow:",
+        ]
+        if repeat_first:
+            lines += [
+                "  STEP 1 - MISTAKES. If the sentence has a mistake: \"Did you mean: I went "
+                "to the office yesterday?\", then explain WHY from the board (the rule is drawn "
+                "there) in two or three short sentences, then \"Now say it.\" STOP and wait. "
+                "Right → \"Good.\" Still wrong → say it once more, accept it, go on. No "
+                "mistake → skip this step with no comment at all.",
+            ]
+        else:
+            lines += [
+                "  STEP 1 - MISTAKES. If the sentence has a mistake, say the right version "
+                "once (\"You mean: …\") without asking them to repeat it. No mistake → "
+                "skip this step with no comment at all.",
+            ]
+        lines += [
+            f"  STEP 2 - SAY IT BETTER, one level up ({up}). Even for a correct sentence. "
+            "Give the richer version: \"Better: I was running late because I got stuck "
+            "in heavy traffic.\" Explain the new parts in ONE short sentence each, two at "
+            "most, with the meaning: \"'got stuck in' - you could not move. 'heavy "
+            "traffic' - we say heavy, not big.\" Then: \"Now you say it.\" STOP and wait. "
+            "Right → \"Good.\" Still wrong → say it once more, accept it, go on.",
+            "  STEP 3 - CONTINUE. Answer what they actually said in one sentence, then ask "
+            "the next question in the topic. Build that question so the natural answer "
+            "needs ONE item from TOPIC WORDS or OLD WORDS DUE BACK in the plan. If they "
+            "then use it right: three words (\"good - 'deal with'\"). If they avoid it: "
+            "\"Try it with 'deal with'.\" once, then let it go.",
+            "  \"Say it.\" and \"Now you say it.\" END YOUR TURN. They are the last words "
+            "you say - nothing after them, not \"Good\", not the next step, not a question. "
+            "\"Good\" is only ever said AFTER you have heard the learner say it. Steps 1, 2 "
+            "and 3 are three SEPARATE turns of yours, with the learner speaking in between:",
+            "    WRONG (one turn): \"You mean: How did you know me? Say it. Good. Better: …\"",
+            "    RIGHT: you \"You mean: How did you know me? Say it.\" → learner says it → "
+            "you \"Good. Better: How did you recognise me? 'Recognise' - you know someone "
+            "again. Now you say it.\" → learner says it → you \"Good. …next question…\"",
+            "  Never do step 3 before the repeats. Never answer the content of a sentence "
+            "with a mistake before its correction is repeated. Never lose their question: "
+            "they must not have to ask twice.",
+            "  Skip step 2 for tiny replies (yes / no / one or two words) and for "
+            "questions about the lesson itself. Exception to the whole order: when they are "
+            "upset or urgent (stop, wait, repeat, I don't understand, help) - answer first.",
+            "",
         ]
     lines += [
-        f"  STEP 2 - SAY IT BETTER, one level up ({up}). Even for a correct sentence. "
-        "Give the richer version: \"Better: I was running late because I got stuck "
-        "in heavy traffic.\" Explain the new parts in ONE short sentence each, two at "
-        "most, with the meaning: \"'got stuck in' - you could not move. 'heavy "
-        "traffic' - we say heavy, not big.\" Then: \"Now you say it.\" STOP and wait. "
-        "Right → \"Good.\" Still wrong → say it once more, accept it, go on.",
-        "  STEP 3 - CONTINUE. Answer what they actually said in one sentence, then ask "
-        "the next question in the topic. Build that question so the natural answer "
-        "needs ONE item from TOPIC WORDS or OLD WORDS DUE BACK in the plan. If they "
-        "then use it right: three words (\"good - 'deal with'\"). If they avoid it: "
-        "\"Try it with 'deal with'.\" once, then let it go.",
-        "  \"Say it.\" and \"Now you say it.\" END YOUR TURN. They are the last words "
-        "you say - nothing after them, not \"Good\", not the next step, not a question. "
-        "\"Good\" is only ever said AFTER you have heard the learner say it. Steps 1, 2 "
-        "and 3 are three SEPARATE turns of yours, with the learner speaking in between:",
-        "    WRONG (one turn): \"You mean: How did you know me? Say it. Good. Better: …\"",
-        "    RIGHT: you \"You mean: How did you know me? Say it.\" → learner says it → "
-        "you \"Good. Better: How did you recognise me? 'Recognise' - you know someone "
-        "again. Now you say it.\" → learner says it → you \"Good. …next question…\"",
-        "  Never do step 3 before the repeats. Never answer the content of a sentence "
-        "with a mistake before its correction is repeated. Never lose their question: "
-        "they must not have to ask twice.",
-        "  Skip step 2 for tiny replies (yes / no / one or two words) and for "
-        "questions about the lesson itself. Exception to the whole order: when they are "
-        "upset or urgent (stop, wait, repeat, I don't understand, help) - answer first.",
-        "",
         "WHAT IS ON THEIR SCREEN - a board, with you standing on it (do not read it out):",
         "- their sentence as they say it, the mistakes in red, the corrected sentence, "
         "the better version with each new item explained and translated, and which "
@@ -589,15 +613,14 @@ def format_for_prompt() -> str:
         "- No grammar lectures, no lists, no long praise. Explain a rule in one short "
         "sentence only when they ask or the same mistake keeps coming back.",
         "",
-        "HOW A LESSON RUNS: a topic starts with a TAUGHT part - the topic's words and "
-        "word partners, linking words, the grammar point, how to make sentences longer, a "
-        "model dialogue line by line, then sentence frames - driven "
-        "step by step by [NEXT] notes. Then the conversation: one easy question with a "
-        "model answer, the three steps on every sentence, going deeper as they manage. "
-        "In the conversation your main job is to make them SPEAK about the topic as much "
-        "as possible: open questions, follow-ups (why? what else? tell me more), and ask "
-        "them to make a short answer longer with a linking word. "
-        "Wrap-up only when they want to stop: one thing done well, one to practise, "
+        ("HOW A LESSON RUNS: the course lesson's steps come one by one in [NEXT] notes; "
+         "then the speaking task. Your main job is to make them SPEAK as much as possible: "
+         "open questions, follow-ups (why? what else? tell me more), and ask them to make a "
+         "short answer longer with a linking word. " if strict else
+         "HOW IT RUNS: free conversation, led by the learner. Greet them, ask one easy "
+         "question in the topic, then follow them. Keep them speaking with real interest in "
+         "what they say. ")
+        + "Wrap-up only when they want to stop: one thing done well, one to practise, "
         "the new words.",
         "",
         _method_playbook(lang, state),
@@ -1157,6 +1180,8 @@ def _free_turn(text: str, handled: dict, player=None) -> str | None:
                                "now (point at it in one more sentence).")
         _turn["drill"] = list(outcome["repeated"])
     improved = result.get("improved", "")
+    if not _intensive_on() and not _turn.get("practice"):
+        return _next(_tutor_reply(text, result, player))
     if result["corrections"]:
         c = result["corrections"][0]
         _turn.update(phase="repeat_fix", expected=result["corrected"],
@@ -1182,6 +1207,33 @@ def _free_turn(text: str, handled: dict, player=None) -> str | None:
         return _next("their sentence is correct - no comment on that. Now " +
                      _better_note(improved, result.get("enrich", [])))
     return _next(_step3(text, player))
+
+
+def _tutor_reply(text: str, result: dict, player) -> str:
+    """The Tutor: guidance, not rules. A mistake is corrected once, kindly, and
+    the conversation goes on - nothing has to be repeated. The board still
+    shows the correction and the better version."""
+    fixes = result.get("corrections") or []
+    improved = result.get("improved", "")
+    if fixes:
+        c = fixes[0]
+        _mode(player, "correct", "")
+        _turn["last_fix"] = {"said": text, "wrong": c.get("wrong", ""), "right": c.get("right", ""),
+                             "why": c.get("why", ""), "board": ""}
+        note = (f'their sentence has a small mistake. In a friendly way, say the right version once: '
+                f'"We\'d say: {result["corrected"]}"'
+                + (f" - with a few words why ({c['why']})" if c.get("why") else "")
+                + ". Do NOT ask them to repeat it. Then answer what they said")
+    elif improved:
+        _mode(player, "better", "")
+        note = ("their sentence is correct. Answer what they said, and in passing offer one more "
+                f'natural way to say it, in a few words: "You could also say: {improved}". Do NOT '
+                "ask them to repeat it. Then carry on")
+    else:
+        _mode(player, "talk")
+        note = "their sentence is correct - no comment on it. Answer what they said"
+    return (note + ", and ask ONE follow-up question about it. Keep it natural and short, then "
+            "STOP and wait.")
 
 
 def _missing(text: str) -> list[str]:
@@ -1834,6 +1886,7 @@ def opening_note(player=None) -> str | None:
         _player = player
     if _intensive_on():
         return _intensive_opening(player)
+    return None     # the Tutor opens with a greeting: it is free conversation
     lang = _lang()
     with _lock:
         state = _load(lang)
@@ -2216,6 +2269,21 @@ def end_silence() -> float:
     except Exception:
         return 1.1
     return {"A1": 1.9, "A2": 1.6, "B1": 1.3}.get(level, 1.1)
+
+
+def catalog_for_ui() -> dict:
+    """Every course of every language, for the Home page: its weeks and lesson titles."""
+    out = []
+    for key, name, levels in COURSE_CATALOG:
+        c = INTENSIVE_COURSES.get(key)
+        if not c:
+            continue
+        weeks = [dict(w, lessons=[l["title"] for l in c["lessons"] if l["week"] == w["week"]])
+                 for w in c["weeks"]]
+        out.append({"key": key, "name": name, "levels": levels, "title": c["title"],
+                    "learner": c.get("learner", ""), "lessons": len(c["lessons"]),
+                    "weeks": weeks})
+    return {"current": _mode_key(), "courses": out}
 
 
 def intensive_for_ui() -> dict:
@@ -2708,7 +2776,7 @@ def status_for_ui() -> dict:
             value["topics"] = _topics_list(state)
             value["lexicon_ready"] = tp.load_lexicon(_data_dir(lang), topic["id"]) is not None
             value["track"] = "intensive" if _intensive_on() else "normal"
-            if _intensive_on():
+            if _course():
                 value["intensive"] = _intensive_status()
             _status_cache.update(key=key, value=value)
         value = dict(_status_cache["value"])

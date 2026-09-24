@@ -262,6 +262,77 @@ export function renderDictionary() {
 
 let accData = null;
 
+// ── Home ────────────────────────────────────────────────────────────────────
+// The courses of every language as tabs, and the "which language?" choice.
+
+let catalog = null;
+
+export async function loadCatalog() {
+  if (!catalog) catalog = await fetch("/api/catalog").then((r) => r.json()).catch(() => null);
+  return catalog;
+}
+
+export async function loadHome(openCourse) {
+  const data = await loadCatalog();
+  const tabs = $("home-tabs"), host = $("home-course");
+  if (!data || !data.courses) return;
+  tabs.textContent = "";
+  const show = (key) => {
+    tabs.querySelectorAll(".home-tab").forEach((b) => b.classList.toggle("active", b.dataset.key === key));
+    const c = data.courses.find((x) => x.key === key);
+    host.textContent = "";
+    const head = node("div", "home-course-head");
+    const left = node("div");
+    left.append(node("h3", "", c.title), node("p", "", c.learner));
+    const go = node("button", "btn primary", key === data.current ? "Open my course" : `Learn ${c.name}`);
+    go.type = "button";
+    go.addEventListener("click", () => openCourse(c.name, key));
+    head.append(left, go);
+    host.append(head);
+    host.append(node("div", "home-course-meta", `${c.levels} · ${c.lessons} lessons · ${c.weeks.length} weeks`));
+    const grid = node("div", "home-weeks");
+    c.weeks.forEach((w) => {
+      const box = node("div", "home-week");
+      const h = node("div", "home-week-head");
+      h.append(node("strong", "", `Week ${w.week} · ${w.title}`), node("span", "badge lvl", w.band));
+      const ol = node("ol");
+      w.lessons.forEach((t) => ol.append(node("li", "", t)));
+      box.append(h, ol);
+      grid.append(box);
+    });
+    host.append(grid);
+  };
+  data.courses.forEach((c) => {
+    const b = node("button", "home-tab", c.name);
+    b.type = "button";
+    b.dataset.key = c.key;
+    b.setAttribute("role", "tab");
+    b.addEventListener("click", () => show(c.key));
+    tabs.append(b);
+  });
+  show((data.courses.find((c) => c.key === data.current) || data.courses[0]).key);
+}
+
+export async function renderLanguageChoice(pick) {
+  const data = await loadCatalog();
+  const host = $("lang-options");
+  host.textContent = "";
+  ((data && data.courses) || []).forEach((c) => {
+    const b = node("button", "lang-option" + (c.key === data.current ? " current" : ""));
+    b.type = "button";
+    b.append(node("strong", "", c.name), node("span", "", `${c.levels} · ${c.lessons} lessons`),
+             node("span", "lang-option-note", c.key === data.current ? "You are learning it now" : c.learner));
+    b.addEventListener("click", () => pick(c.name, c.key));
+    host.append(b);
+  });
+}
+
+// The Grammar page (opened from Account): the syllabus with your mastery.
+export async function loadGrammar() {
+  const res = await fetch("/api/account").then((r) => r.json()).catch(() => null);
+  if (res && !res.error) renderGrammar(res);
+}
+
 export async function loadAccount() {
   const res = await fetch("/api/account").then((r) => r.json()).catch(() => null);
   if (!res || res.error) {
@@ -296,7 +367,6 @@ export async function loadAccount() {
     .filter((r) => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 10);
   hbars($("chart-skills"), bySkill);
 
-  renderGrammar(res);
 
   const sel = $("mis-skill");
   const keep = sel.value;

@@ -10,19 +10,19 @@
 </head>
 <body data-page="lesson">
   <header class="bar">
-    <a class="brand" href="#/courses"><span class="mark">L</span><span>LangVis</span></a>
-    <div class="chip" id="chip-level" title="Your measured level">-</div>
-    <a class="chip wide chip-btn chip-intensive" id="chip-intensive" href="#/courses" title="Your course - open the course map">Course</a>
-    <button class="chip wide chip-btn" id="chip-unit" type="button" title="The whole grammar syllabus and how well you know each rule">Grammar</button>
-    <div class="spacer"></div>
+    <a class="brand" href="#/home" aria-label="langvis.ai - home"><img class="brand-logo" src="/static/logo-bar.png" alt="langvis.ai"></a>
+    <!-- Left: the language being learned and its level, the same small blocks. -->
     <div class="dropdown lang-drop">
-      <button class="topic-pick dropdown-toggle" id="lang-btn" type="button" data-bs-toggle="dropdown"
+      <button class="chip chip-btn lang-chip dropdown-toggle" id="lang-btn" type="button" data-bs-toggle="dropdown"
               aria-expanded="false" title="The language you are learning - each has its own level and progress">
-        <svg class="topic-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <svg class="chip-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
         <span id="lang-name">Language</span>
       </button>
-      <ul class="dropdown-menu dropdown-menu-end topic-menu lang-menu" id="lang-menu" aria-labelledby="lang-btn"></ul>
+      <ul class="dropdown-menu topic-menu lang-menu" id="lang-menu" aria-labelledby="lang-btn"></ul>
     </div>
+    <div class="chip" id="chip-level" title="Your measured level">-</div>
+    <div class="spacer"></div>
+    <!-- Right (Tutor only): the topic and the grammar syllabus, the same green buttons. -->
     <div class="dropdown topic-drop">
       <button class="topic-pick dropdown-toggle" id="topic-btn" type="button" data-bs-toggle="dropdown"
               aria-expanded="false" title="What we talk about">
@@ -31,11 +31,15 @@
       </button>
       <ul class="dropdown-menu dropdown-menu-end topic-menu" id="topic-menu" aria-labelledby="topic-btn"></ul>
     </div>
+    <button class="topic-pick grammar-pick" id="chip-unit" type="button" title="The whole grammar syllabus and how well you know each rule">
+      <svg class="topic-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12l2.2 2.2L15.5 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span id="unit-name">Grammar</span>
+    </button>
     <nav class="nav">
-      <a href="#/courses" data-page="courses">Courses</a>
-      <a href="#/lesson" data-page="lesson">Classroom</a>
-      <a href="#/dictionary" data-page="dictionary">Dictionary</a>
-      <a href="#/account" data-page="account">Account</a>
+      <a href="#/home" data-page="home" title="Home"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 20v-6h4v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Home</span></a>
+      <a href="#/courses" data-page="courses" title="Courses"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 8h7M9 12h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Courses</span></a>
+      <a href="#/tutor" data-page="tutor" title="Tutor"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9.5h8M8 12.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Tutor</span></a>
+      <a href="#/account" data-page="account" title="Account"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Account</span></a>
     </nav>
     <button class="icon-btn" id="settings-btn" type="button" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.6h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.8c.1.6.1 1.3 0 1.9l2 1.8-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.8a6 6 0 0 1 0-1.9l-2-1.8 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
@@ -177,6 +181,119 @@
     </footer>
   </main>
 
+  <!-- ── Home ────────────────────────────────────────────────────────────── -->
+  <main class="page home hidden" id="page-home">
+    <section class="home-hero">
+      <img class="home-logo" src="/static/img/logo-full.png" alt="langvis.ai">
+      <h1>A speaking language teacher in your browser</h1>
+      <p class="home-lead">LangVis talks with you by voice and checks every sentence before it answers.
+        Learn a language step by step in a <strong>course</strong>, or talk freely with your
+        <strong>tutor</strong> - about anything, whenever you want.</p>
+      <div class="home-cta">
+        <button class="btn primary home-start" type="button" id="home-start">Start learning a new language</button>
+        <a class="btn" href="#/tutor">Talk with the Tutor</a>
+      </div>
+      <ul class="home-facts">
+        <li><strong>2</strong><span>languages · English, Slovak</span></li>
+        <li><strong>50</strong><span>course lessons, A1 → B1</span></li>
+        <li><strong>13+</strong><span>conversation topics, and your own</span></li>
+        <li><strong>Live</strong><span>two-way voice, corrected as you speak</span></li>
+      </ul>
+    </section>
+
+    <section class="home-section">
+      <h2>Two ways to learn</h2>
+      <p class="home-sub">Choose the side that fits the moment - and switch any time from the header.</p>
+      <div class="home-two">
+        <article class="home-card">
+          <div class="home-card-kicker">Courses</div>
+          <h3>Step by step, from zero</h3>
+          <p>A course is fixed, hand-written material. The teacher follows it exactly, never skips
+            and never jumps ahead, and remembers the step where you stopped.</p>
+          <ul>
+            <li>Review, new words, ready phrases, one grammar point</li>
+            <li>A dialogue line by line, translation or sentence building</li>
+            <li>Questions about your own life, then a speaking task</li>
+            <li>The syllabus stays open on the left while you learn</li>
+          </ul>
+          <img src="/static/img/03-course-words.png" alt="A course lesson on the board" loading="lazy">
+        </article>
+        <article class="home-card">
+          <div class="home-card-kicker">Tutor</div>
+          <h3>Free conversation, gentle help</h3>
+          <p>A friendly conversation partner, not a drill. Pick a topic or just talk, and ask for
+            any grammar rule, word or role play at any moment.</p>
+          <ul>
+            <li>A mistake is corrected once, kindly - no forced repeats</li>
+            <li>Now and then: one more natural way to say it</li>
+            <li>Grammar drawn on the board whenever you ask</li>
+            <li>Follow-up questions that keep you speaking</li>
+          </ul>
+          <img src="/static/img/07-topic-correction.png" alt="A correction in the Tutor" loading="lazy">
+        </article>
+      </div>
+    </section>
+
+    <section class="home-section">
+      <h2>Our courses</h2>
+      <p class="home-sub">Every course is written for real speaking. Pick a language to see its lessons.</p>
+      <div class="home-tabs" role="tablist" id="home-tabs"></div>
+      <div class="home-course" id="home-course"></div>
+    </section>
+
+    <section class="home-section">
+      <h2>How one sentence is checked</h2>
+      <p class="home-sub">LangVis thinks before it answers. Your own voice is written down with its
+        mistakes kept, checked, and only then does the teacher speak.</p>
+      <ol class="home-steps">
+        <li><strong>You speak</strong><span>The server hears the end of your sentence - it waits
+          longer for beginners who pause to find a word.</span></li>
+        <li><strong>It thinks</strong><span>Your words are transcribed exactly as said and analysed:
+          mistakes, the grammar behind them, a richer version.</span></li>
+        <li><strong>It answers</strong><span>The board shows the mistakes in red and why; the teacher
+          corrects you, offers a better way, and the talk goes on.</span></li>
+      </ol>
+      <div class="home-two">
+        <img src="/static/img/09-grammar-board.png" alt="Grammar on the board" loading="lazy">
+        <img src="/static/img/08-topic-better.png" alt="A better way to say it" loading="lazy">
+      </div>
+    </section>
+
+    <section class="home-section">
+      <h2>Made for beginners</h2>
+      <div class="home-three">
+        <div class="home-mini"><h3>Explained simply</h3><p>Slovak A1 is explained in simple English,
+          later levels in simple Slovak - with the Azerbaijani translation of every word on the board.</p></div>
+        <div class="home-mini"><h3>Heard correctly</h3><p>A slow sentence is not cut off, names are
+          written as you say them, and repeating after the teacher is never mistaken for its echo.</p></div>
+        <div class="home-mini"><h3>Nothing starts by itself</h3><p>The teacher begins only when you
+          press Start, and stops when you leave the page or change the topic, language or lesson.</p></div>
+      </div>
+    </section>
+
+    <section class="home-section">
+      <h2>Your progress, always kept</h2>
+      <p class="home-sub">Each language keeps its own level, course position, words and history.</p>
+      <div class="home-two">
+        <div class="home-list">
+          <div><h3>Account</h3><p>Your level over time, mistakes per day and where they are, every
+            correction ever made.</p></div>
+          <div><h3>Dictionary</h3><p>Every word and phrase you met, with how often and on how many
+            different days you used it - it comes back until it is yours.</p></div>
+          <div><h3>Grammar</h3><p>Every rule from A1 to B2 with how well you know it, measured from
+            what you actually say.</p></div>
+        </div>
+        <img src="/static/img/12-account.png" alt="Your account" loading="lazy">
+      </div>
+    </section>
+
+    <section class="home-final">
+      <h2>Ready to speak?</h2>
+      <button class="btn primary home-start" type="button" id="home-start-2">Start learning a new language</button>
+      <p class="home-author">langvis.ai · designed and built by Taleh Rzayev</p>
+    </section>
+  </main>
+
   <!-- ── Courses ─────────────────────────────────────────────────────────── -->
   <main class="page doc hidden" id="page-courses">
     <div class="doc-head">
@@ -195,6 +312,7 @@
   <!-- ── Dictionary ──────────────────────────────────────────────────────── -->
   <main class="page doc hidden" id="page-dictionary">
     <div class="doc-head">
+      <a class="back-link" href="#/account">← Account</a>
       <h1>Dictionary</h1>
       <p class="sub" id="dict-sub"></p>
     </div>
@@ -226,11 +344,29 @@
     </div>
   </main>
 
+  <!-- ── Grammar (from Account) ──────────────────────────────────────────── -->
+  <main class="page doc hidden" id="page-grammar">
+    <div class="doc-head doc-head-row">
+      <div>
+        <a class="back-link" href="#/account">← Account</a>
+        <h1>Grammar</h1>
+        <p class="sub">Every grammar rule from A1 to B2 and how well you know it - measured from what you say. Click one to see your own mistakes and the rule.</p>
+      </div>
+    </div>
+    <div class="syllabus" id="acc-grammar"></div>
+  </main>
+
   <!-- ── Account ─────────────────────────────────────────────────────────── -->
   <main class="page doc hidden" id="page-account">
-    <div class="doc-head">
-      <h1>Account</h1>
-      <p class="sub" id="acc-sub"></p>
+    <div class="doc-head doc-head-row">
+      <div>
+        <h1>Account</h1>
+        <p class="sub" id="acc-sub"></p>
+      </div>
+      <div class="head-actions">
+        <a class="btn" href="#/dictionary">Dictionary</a>
+        <a class="btn" href="#/grammar">Grammar</a>
+      </div>
     </div>
     <div class="stats" id="acc-stats"></div>
 
@@ -257,11 +393,6 @@
       </section>
     </div>
 
-    <section class="card">
-      <h2>Grammar syllabus</h2>
-      <p class="card-sub">Every grammar rule from A1 to B2 and how well you know it - measured from what you say. Click one to see your own mistakes and the rule.</p>
-      <div class="syllabus" id="acc-grammar"></div>
-    </section>
 
 
     <section class="card">
@@ -279,6 +410,16 @@
   </main>
 
   <div class="chart-tip hidden" id="tooltip" role="status"></div>
+
+  <!-- ── Start learning a new language: which one? ───────────────────────── -->
+  <div class="overlay hidden" id="lang-overlay">
+    <div class="dialog wide lang-dialog">
+      <h1>Which language do you want to learn?</h1>
+      <p>Your level, course and words are kept separately for each language.</p>
+      <div class="lang-options" id="lang-options"></div>
+      <div class="actions"><button class="btn" type="button" id="lang-cancel">Cancel</button></div>
+    </div>
+  </div>
 
   <div class="overlay hidden" id="key-overlay">
     <form class="dialog" id="key-form">
