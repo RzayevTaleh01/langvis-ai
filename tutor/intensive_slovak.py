@@ -1648,6 +1648,7 @@ LESSONS += [
 COURSE = {
     "id": "slovak_intensive",
     "language": "slovak",
+    "learner": "The learner started Slovak from ZERO.",
     "title": "Slovak · A1 → B1 · 6 weeks",
     "weeks": [
         {"week": 1, "title": "Me and my world", "band": "A1"},

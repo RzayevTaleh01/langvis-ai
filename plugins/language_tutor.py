@@ -42,7 +42,7 @@ from pathlib import Path
 
 from tutor import analysis as an
 from tutor import curriculum as cur
-from tutor import intensive_slovak
+from tutor import intensive_english, intensive_slovak
 from tutor import progress as pg
 from tutor import topics as tp
 
@@ -1266,8 +1266,8 @@ def gate_audio(pcm16k: bytes, seconds: float, player=None, echo=None,
     lang = _lang()
     try:
         if seconds < SHORT_TURN or _turn["phase"] != "free":
-            text = an.transcribe(pcm16k, lang["name"], expected=_turn.get("expected", ""),
-                                 vocabulary=_hint_words(), native_language=_native())
+            text = an.transcribe(pcm16k, lang["name"], vocabulary=_transcribe_hints(),
+                                 native_language=_native())
             if not an.words(text):
                 return {"drop": True}
             if echo is not None and echo(text):
@@ -1505,6 +1505,7 @@ _SECTION = {
     "review": ("Review", "a quick review of words from earlier lessons"),
     "phrases": ("Phrases", "ready phrases to say"),
     "translate": ("Translate", "translation practice - the learner says it themselves"),
+    "build": ("Build sentences", "sentence building - the learner joins or upgrades sentences themselves"),
     "questions": ("Questions for you", "questions about the learner's own life"),
     "words": ("Words", "the key words of the topic"),
     "collocations": ("Word partners", "words that go together"),
@@ -1547,6 +1548,8 @@ def _teach_steps(pack: dict) -> list[dict]:
         partner, first = None, False
     for n, tr in enumerate(pack.get("translate") or []):
         steps.append({"kind": "translate", "first": n == 0, "item": tr, "expect": tr["sk"]})
+    for n, b in enumerate(pack.get("build") or []):
+        steps.append({"kind": "build", "first": n == 0, "item": b, "expect": b["answer"]})
     for n, q in enumerate(pack.get("questions") or []):
         steps.append({"kind": "questions", "first": n == 0, "item": q, "expect": q["example"],
                       "open": True})
@@ -1569,6 +1572,9 @@ def _teach_card(pack: dict, step: dict) -> dict:
     elif kind == "translate":
         card["formula"] = [t["en"] for t in pack.get("translate") or []]
         card["rule"] = it["en"]
+    elif kind == "build":
+        card["formula"] = [b["task"] for b in pack.get("build") or []]
+        card["rule"] = it["task"]
     elif kind == "questions":
         card["formula"] = [q["q"] for q in pack.get("questions") or []]
         card["rule"] = it["q"]
@@ -1627,15 +1633,23 @@ def _teach_say(pack: dict, step: dict) -> str:
             intro = f"(In {ex}: now the learner makes {what} - they finish each sentence.) "
         else:
             intro = f"(In {ex}: now {what}.) "
-    if kind == "review":
+    same = pack.get("same_lang")
+    if kind == "review" and same:
+        body = (f"Ask which word or phrase from an earlier lesson means \"{it['meaning']}\", and wait - "
+                f"the answer is \"{it['text']}\"; do NOT say it yourself. Then STOP.")
+    elif kind == "review":
         body = (f"Ask how to say \"{it['meaning']}\" in the language they learn (in {ex}), and wait - "
                 f"the answer is \"{it['text']}\"; do NOT say it yourself. Then STOP.")
+    elif kind == "build":
+        body = (f"Give the task clearly: \"{it['task']}\" - and ask them to say the new sentence "
+                f"themselves. Do NOT say the answer (\"{it['answer']}\"). Then STOP.")
     elif kind == "translate":
         body = (f"Say in {ex}: \"{it['en']}\" - and ask them to say it in the language they learn "
                 f"themselves. Do NOT say the answer (\"{it['sk']}\"). Then STOP.")
     elif kind == "questions":
-        body = (f"Ask the question \"{it['q']}\" slowly, say what it means in {ex} "
-                f"(\"{it['meaning']}\"), and give a model answer they can change: "
+        body = (f"Ask the question \"{it['q']}\" slowly, "
+                + (f"say what it means in {ex} (\"{it['meaning']}\"), " if it.get("meaning") else "")
+                + "and give a model answer they can change: "
                 f"\"{it['example']}\". Then ask for THEIR OWN answer and STOP.")
     elif kind in ("words", "collocations", "phrases"):
         body = (f"Say \"{it['text']}\" slowly and clearly, then its meaning in {ex}: "
@@ -1650,10 +1664,12 @@ def _teach_say(pack: dict, step: dict) -> str:
         body = ((f"Explain the grammar point \"{it.get('name', '')}\" in simple {ex}, in one or two "
                  f"short sentences: {it.get('rule', '')} Point at the board. Then the example "
                  if step["first"] else "Another example of the same grammar: ")
-                + f"\"{step['expect']}\" (say what it means in {ex}"
-                + (f": \"{it['meanings'][it['examples'].index(step['expect'])]}\""
-                   if step["expect"] in (it.get("examples") or []) and it.get("meanings") else "")
-                + f"). Then: \"{say_it} {step['expect']}\"")
+                + f"\"{step['expect']}\""
+                + ("" if same else f" (say what it means in {ex}"
+                   + (f": \"{it['meanings'][it['examples'].index(step['expect'])]}\""
+                      if step["expect"] in (it.get("examples") or []) and it.get("meanings") else "")
+                   + ")")
+                + f". Then: \"{say_it} {step['expect']}\"")
     elif kind == "extend" and step.get("own"):
         body = (f"Now the learner makes THEIR OWN sentence longer. In {ex}: ask them to say one short "
                 "sentence about themselves on this topic, and then the same sentence longer - with "
@@ -1664,10 +1680,12 @@ def _teach_say(pack: dict, step: dict) -> str:
                 + f"\"{it['text']}\" (what it means in {ex}). Then: \"{say_it} {it['text']}\"")
     elif kind == "dialogue":
         partner = step.get("partner")
-        body = ((f"As the {pack.get('partner_role') or 'partner'}, say \"{partner['text']}\" and "
-                 f"its meaning in {ex} (\"{partner['meaning']}\"). " if partner else "")
-                + f"Then give the learner their line: \"{it['text']}\" - meaning in {ex}: "
-                f"\"{it['meaning']}\". Then \"{say_it}\" and the line once more.")
+        body = ((f"As the {pack.get('partner_role') or 'partner'}, say \"{partner['text']}\""
+                 + (f" and its meaning in {ex} (\"{partner['meaning']}\")" if partner.get("meaning") else "")
+                 + ". " if partner else "")
+                + f"Then give the learner their line: \"{it['text']}\""
+                + (f" - meaning in {ex}: \"{it['meaning']}\"" if it.get("meaning") else "")
+                + f". Then \"{say_it}\" and the line once more.")
     else:
         body = (f"Say the frame \"{it['frame']}\" (the gap is a short pause), what it means in "
                 f"{ex} (\"{it['meaning']}\"), and what to put in the gap: {it['hint']}. Give the "
@@ -1854,9 +1872,9 @@ def _teach_again(player=None) -> str:
 # material lesson by lesson, step by step, and remembers exactly where the
 # learner stopped. It runs on the same step engine as a topic's taught part.
 
-INTENSIVE_COURSES = {"slovak": intensive_slovak.COURSE}
+INTENSIVE_COURSES = {"slovak": intensive_slovak.COURSE, "english": intensive_english.COURSE}
 # Every language on the Courses page; one without a course yet shows as coming.
-COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("english", "English", "A2 → B2")]
+COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("english", "English", "A2 → B1")]
 REVIEW_ITEMS = 4
 
 
@@ -1922,14 +1940,17 @@ def _lesson_pack(idx: int, lesson: dict) -> dict:
     return {
         "intensive": True, "lesson_index": idx, "name": lesson["title"], "level": lesson["band"],
         "explain_in": _explain_in(lesson["band"]), "partner_role": lesson["partner_role"],
+        # An English course is taught in English: no "what it means in English" for its sentences.
+        "same_lang": _explain_in(lesson["band"]) == _lang()["name"],
         "review": _review_items(idx),
-        "words": [dict(w, example="") for w in lesson["words"]],
+        "words": [dict(w, example=w.get("example", "")) for w in lesson["words"]],
         "phrases": [dict(p, example="") for p in lesson["phrases"]],
         "grammar": {"name": g["name"], "rule": g["rule"], "table": g.get("table", []),
                     "examples": [sk for sk, _en in g["examples"]],
                     "meanings": [en for _sk, en in g["examples"]], "skills": g.get("skills", [])},
         "dialogue": lesson["dialogue"],
-        "translate": lesson["translate"],
+        "translate": lesson.get("translate") or [],
+        "build": lesson.get("build") or [],
         "questions": lesson["questions"],
         "speak": lesson["speak"],
     }
@@ -1941,8 +1962,8 @@ def _intensive_plan(idx: int, lesson: dict, lang: dict) -> str:
     earlier = [l["title"] for l in course.get("lessons", [])[:idx]]
     return "\n".join([
         f"[LESSON PLAN - {course.get('title', 'INTENSIVE COURSE')}]",
-        f"The learner started {lang['name']} from ZERO. This is an intensive course that you "
-        "follow exactly - never skip its material, never jump ahead.",
+        course.get("learner") or f"The learner started {lang['name']} from ZERO.",
+        "This is a course that you follow exactly - never skip its material, never jump ahead.",
         f"Lesson {idx + 1} of {total} (week {lesson['week']}, day {lesson['day']}, {lesson['band']}): "
         f"\"{lesson['title']}\". Goal: {lesson['goal']}.",
         "New words: " + ", ".join(f"{w['text']} ({w['meaning']})" for w in lesson["words"]),
@@ -2127,6 +2148,25 @@ def _intensive_status() -> dict:
             "weeks": course.get("weeks", [])}
 
 
+OWN_ANSWER_STEPS = ("review", "translate", "build", "questions", "frames")
+
+
+def _transcribe_hints() -> list[str] | None:
+    """Spelling help for the transcriber - only while the learner repeats
+    what they were just given. When the answer is their own (a question about
+    their life, a translation, a word to recall), a list of likely words makes
+    the transcriber hear the list instead of the learner."""
+    teach = _turn.get("teach") or {}
+    steps = teach.get("steps") or []
+    i = int(teach.get("i", 0))
+    if _turn.get("phase") != "teach" or not steps or i >= len(steps):
+        return None
+    step = steps[i]
+    if step.get("open") or step["kind"] in OWN_ANSWER_STEPS:
+        return None
+    return _hint_words()
+
+
 def _hint_words() -> list[str]:
     """The words the learner is most likely saying now - handed to the
     transcriber so a beginner's accent is heard as the right word."""
@@ -2184,6 +2224,8 @@ def intensive_for_ui() -> dict:
     active = str(_setting("track", "normal")) == "intensive"
     courses = []
     for key, name, levels in COURSE_CATALOG:
+        if key != _mode_key():
+            continue                # only the courses of the language being learned
         c = INTENSIVE_COURSES.get(key)
         courses.append({"key": key, "name": name, "levels": levels, "available": bool(c),
                         "lessons": len(c["lessons"]) if c else 0,
@@ -2755,11 +2797,17 @@ def set_topic(topic_id: str = "", custom: str = "", player=None,
                 return False, f"There is no topic '{topic_id}'."
             topic = {"id": topic_id, "name": entry.get("name", topic_id),
                      "subtopics": [], "custom": True}
+    # A topic belongs to the normal lessons: choosing one leaves the course.
+    left_course = _intensive_on()
+    if left_course:
+        _save_setting({"track": "normal"})
+        reset_lesson()
+        _status_cache["key"] = None
     with _lock:
         state = _load(lang)
         _ensure_topic(state)
         changed = pg.switch_topic(state, topic["id"], topic["name"],
-                                  custom=bool(topic.get("custom")))
+                                  custom=bool(topic.get("custom"))) or left_course
         new_prompt = False
         if prompt is not None:
             entry = state["topics"][topic["id"]]

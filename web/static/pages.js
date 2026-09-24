@@ -385,8 +385,6 @@ export async function loadIntensive(act) {
   const now = $("int-now"), weeks = $("int-weeks");
   now.textContent = "";
   weeks.textContent = "";
-  document.querySelectorAll(".int-switch .seg").forEach((b) =>
-    b.classList.toggle("active", (b.dataset.track === "intensive") === !!(data && data.active)));
   if (!data || data.error) {
     $("int-sub").textContent = "The course could not be loaded.";
     return;
@@ -395,7 +393,7 @@ export async function loadIntensive(act) {
   if (!data.available) {
     $("int-title").textContent = "";
     $("int-sub").textContent = "";
-    now.append(node("p", "", `There is no course for ${data.language} yet - choose one above.`));
+    now.append(node("p", "", `There is no course for ${data.language} yet.`));
     return;
   }
   $("int-title").textContent = data.title;
@@ -456,7 +454,7 @@ function renderCourseCards(data, act) {
       c.available ? `${c.lessons} lessons · ${c.weeks} weeks` : "Coming soon"));
     card.addEventListener("click", () => {
       if (!c.available) return;
-      act("track", `intensive:${c.key}`);
+      act("choose", `intensive:${c.key}`);
       setTimeout(() => loadIntensive(act), 700);
     });
     host.append(card);

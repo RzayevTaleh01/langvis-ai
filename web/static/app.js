@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 const audio = new Audio();
 let ws = null;
 let started = false;
+let startWith = {};   // a course or course lesson that goes with the next Start
 let freshStart = false;
 let tutorTurnOpen = false;  // the tutor is in the middle of a turn     // the first "start" of this page opens a new lesson
 let muted = false;
@@ -27,9 +28,15 @@ function connect() {
   // After a lost connection the lesson simply carries on.
   ws.onopen = () => {
     pending.splice(0).forEach(send);
-    if (!started) return;
-    send({ type: "start", fresh: freshStart });
-    freshStart = false;
+    if (freshStart) {                 // Start was pressed before the socket was open
+      send(Object.assign({ type: "start", fresh: true }, startWith));
+      freshStart = false;
+      startWith = {};
+    } else if (started) {
+      // The connection (or the server) was lost: the lesson does not start
+      // again by itself - Start is pressed again.
+      stopped();
+    }
   };
   ws.onmessage = (e) => {
     if (e.data instanceof ArrayBuffer) { audio.play(e.data); return; }
@@ -75,6 +82,7 @@ const handlers = {
     board.onWords(m.text);
   },
   answers: (m) => board.answers(m),
+  stopped: () => stopped(),
   reset: () => {
     board.reset();
     loadHistory();
@@ -689,14 +697,16 @@ function addLog(text) {
 // ── Pages ───────────────────────────────────────────────────────────────────
 
 function route() {
-  let page = (location.hash.replace(/^#\/?/, "") || "lesson").split("?")[0];
+  // Courses is the home page.
+  let page = (location.hash.replace(/^#\/?/, "") || "courses").split("?")[0];
   if (page === "intensive") page = "courses";
-  const known = ["lesson", "courses", "dictionary", "account"].includes(page) ? page : "lesson";
+  const known = ["lesson", "courses", "dictionary", "account"].includes(page) ? page : "courses";
   document.body.dataset.page = known;
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("hidden", p.id !== `page-${known}`));
   document.querySelectorAll(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === known));
-  // The pages can be read without starting the lesson; only the lesson needs sound.
-  if (known === "lesson") begin();
+  // Nothing starts by itself: the teacher begins when Start is pressed, and
+  // stops when the Classroom is left.
+  if (known !== "lesson" && started) { send({ type: "stop" }); stopped(); }
   if (known === "courses") loadIntensive(act);
   if (known === "dictionary") loadDictionary();
   if (known === "account") loadAccount();
@@ -710,24 +720,27 @@ function goTo(page) {
 }
 
 // What the Courses page asks for.
+// Its "Start / Continue the lesson" and the lesson tiles are an explicit
+// start, so they open the Classroom and begin at once.
 function act(kind, value) {
-  if (kind === "track") {
-    sendSoon({ type: "track", value });
-    if (value === "intensive" && document.body.dataset.page === "courses") goTo("lesson");
+  if (kind === "choose") {
+    sendSoon({ type: "track", value });   // a course card: only choose it
+  } else if (kind === "track") {
+    startWith = { track: value };          // the course goes with Start, applied first
+    goTo("lesson");
+    begin();
   } else if (kind === "lesson") {
-    sendSoon({ type: "intensive_lesson", index: value });
+    startWith = { lesson: value };
     goTo("lesson");
+    begin();
   } else if (kind === "open") {
+    startWith = { track: "intensive" };
     goTo("lesson");
+    begin();
   }
 }
 
-// The Lessons / Courses switch on the Courses page.
-document.querySelectorAll(".int-switch .seg").forEach((b) => b.addEventListener("click", () => {
-  sendSoon({ type: "track", value: b.dataset.track });
-  if (b.dataset.track === "normal") goTo("lesson");
-  else setTimeout(() => loadIntensive(act), 600);
-}));
+$("start-btn").addEventListener("click", () => begin());
 
 // ── Controls ────────────────────────────────────────────────────────────────
 
@@ -808,7 +821,7 @@ function drawWave() {
     }
   }
 
-  $("voice-hint").textContent = !started ? "Click anywhere to start"
+  $("voice-hint").textContent = !started ? "Press Start to begin"
     : muted ? "Microphone off - click the mic"
     : speaking ? "LangVis is speaking - talk to cut in"
     : state === "THINKING" ? "Thinking…"
@@ -855,10 +868,26 @@ async function begin() {
 function go() {
   if (started) return;
   started = true;
+  beginning = false;
+  $("start-gate").classList.add("hidden");
   $("speech-text").textContent = "Connecting - I will start talking in a moment.";
-  // Opening (or reloading) the page starts the lesson again from nothing.
+  // Start begins the lesson from nothing (with the course chosen, if any).
   freshStart = true;
-  if (ws && ws.readyState === WebSocket.OPEN) { send({ type: "start", fresh: true }); freshStart = false; }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    send(Object.assign({ type: "start", fresh: true }, startWith));
+    freshStart = false;
+    startWith = {};
+  }
+}
+
+// The lesson has stopped (the Classroom was left, a topic, language or course
+// changed, or the connection was lost): the teacher is silent until Start.
+function stopped() {
+  started = false;
+  beginning = false;
+  audio.flush();
+  $("start-gate").classList.remove("hidden");
+  setState("SLEEPING");
 }
 
 $("key-form").addEventListener("submit", async (e) => {

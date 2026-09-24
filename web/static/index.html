@@ -10,7 +10,7 @@
 </head>
 <body data-page="lesson">
   <header class="bar">
-    <a class="brand" href="#/lesson"><span class="mark">L</span><span>LangVis</span></a>
+    <a class="brand" href="#/courses"><span class="mark">L</span><span>LangVis</span></a>
     <div class="chip" id="chip-level" title="Your measured level">-</div>
     <a class="chip wide chip-btn chip-intensive" id="chip-intensive" href="#/courses" title="Your course - open the course map">Course</a>
     <button class="chip wide chip-btn" id="chip-unit" type="button" title="The whole grammar syllabus and how well you know each rule">Grammar</button>
@@ -32,8 +32,8 @@
       <ul class="dropdown-menu dropdown-menu-end topic-menu" id="topic-menu" aria-labelledby="topic-btn"></ul>
     </div>
     <nav class="nav">
-      <a href="#/lesson" data-page="lesson">Lesson</a>
       <a href="#/courses" data-page="courses">Courses</a>
+      <a href="#/lesson" data-page="lesson">Classroom</a>
       <a href="#/dictionary" data-page="dictionary">Dictionary</a>
       <a href="#/account" data-page="account">Account</a>
     </nav>
@@ -54,6 +54,15 @@
       <div class="course-side-list" id="cs-list"></div>
     </aside>
     <section class="board" id="board" aria-label="Board">
+      <div class="start-gate" id="start-gate">
+        <div class="start-box">
+          <h2>Ready when you are</h2>
+          <p id="start-what">Press Start and the teacher begins. Allow the microphone when the browser asks.</p>
+          <button class="btn primary start-btn" id="start-btn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            Start</button>
+        </div>
+      </div>
       <div class="board-top">
       <div class="board-head">
         <span class="mode-pill" id="mode-pill" data-mode="idle">
@@ -172,11 +181,7 @@
   <main class="page doc hidden" id="page-courses">
     <div class="doc-head">
       <h1>Courses</h1>
-      <p class="sub">Step-by-step courses from zero, with a teacher who follows the material.</p>
-    </div>
-    <div class="int-switch" role="group" aria-label="Section">
-      <button class="seg" type="button" data-track="normal">Lessons</button>
-      <button class="seg" type="button" data-track="intensive">Courses</button>
+      <p class="sub">Step-by-step courses for the language you are learning, with a teacher who follows the material.</p>
     </div>
     <div class="course-cards" id="course-cards"></div>
     <div class="int-course-head">

@@ -444,8 +444,9 @@ def analysis_prompt(text: str, *, language_name: str, native_language: str,
             "THE UTTERANCE is the attached audio of the learner speaking.\n"
             "FIRST write it down in \"transcript\" EXACTLY as spoken - every word, "
             "every grammar mistake kept as it was said (\"I go yesterday\" stays \"I go "
-            "yesterday\"), nothing added, nothing corrected - with normal capital letters "
-            "and punctuation. Then analyse THAT transcript.")
+            "yesterday\"), nothing added, nothing corrected, names of places and people "
+            "exactly as heard - with normal capital letters and punctuation. Then analyse "
+            "THAT transcript.")
         transcript_field = '\n  "transcript": "exactly what they said, mistakes kept",'
     else:
         utterance = f'THE UTTERANCE (automatic speech-to-text transcript):\n"""{text}"""'
@@ -582,25 +583,25 @@ def transcribe(pcm16k: bytes, language_name: str = "English", expected: str = ""
                vocabulary: list[str] | None = None, native_language: str = "") -> str:
     """Only the words - for a repeat, where there is nothing new to analyse.
 
-    A beginner's accent is hard to hear, so the transcriber is told what they
-    were just asked to say and which words the lesson uses - as a hint for
-    spelling, never as a replacement for what was really said. A language
-    other than English goes to the stronger model: the light one hears
-    beginner Slovak badly."""
+    A beginner's accent is hard to hear, so for a repeat the transcriber may be
+    given the lesson's words - for spelling only. It is never told the sentence
+    the learner was asked to say: told that, it writes the expected sentence
+    instead of what was said ("Bývam v Prešove" came out as "Bývam v
+    Bratislave"), and every answer looks right. `expected` is kept for old
+    callers and ignored. A language other than English goes to the stronger
+    model: the light one hears beginner Slovak badly."""
     hints = []
-    if expected:
-        hints.append(f'They were just asked to say: "{expected}".')
     if vocabulary:
-        hints.append("Words from their lesson: " + ", ".join(vocabulary[:40]) + ".")
+        hints.append("Words from their lesson, ONLY to help with spelling (never write one "
+                     "that was not clearly spoken): " + ", ".join(vocabulary[:40]) + ".")
     prompt = (
         f"Transcribe this audio. The speaker is a beginner learner of {language_name}"
         + (f" (native language {native_language})" if native_language else "")
         + ", with an accent and slow, careful speech. " + " ".join(hints)
         + f" Write exactly what they really said, word for word. Spell {language_name} words "
-        f"correctly, with all diacritics. Keep their grammar mistakes and missing words - "
-        "if they said something different from what they were asked, write what they said, "
-        "not the expected sentence. If they speak another language, write that as said. "
-        "Return only the words.")
+        f"correctly, with all diacritics. Names of places and people exactly as heard. Keep "
+        "their grammar mistakes and missing words, never correct or complete the sentence. "
+        "If they speak another language, write that as said. Return only the words.")
     model = ANALYSIS_MODEL if language_name == "English" else LESSON_MODEL
     return gemini(prompt, model=model, audio_wav=pcm_to_wav(pcm16k)).strip().strip('"')
 

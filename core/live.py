@@ -1015,9 +1015,26 @@ class LiveSession:
         except Exception as e:
             print(f"[Memory] ⚠️ Lesson summary failed: {e}")
 
+    def stop(self) -> None:
+        """End the lesson: the voice session closes and nothing starts again
+        until the learner presses Start. Progress is kept."""
+        self._stopping = True
+        reset = plugin_fn("reset_lesson")
+        if reset is not None:
+            reset()
+        with self._speaking_lock:
+            speaking = self._is_speaking
+        if speaking or (self.audio_in_queue and not self.audio_in_queue.empty()):
+            self.interrupt()
+        self._lesson_started = False
+        self._new_topic = False
+        self._resume_handle = None
+        self._vad.reset()
+
     async def run(self):
         self._loop = asyncio.get_running_loop()
         self._reconnect_event = asyncio.Event()
+        self._stopping = False
         set_trim_notifier(self.ui.write_log)
 
         while True:
@@ -1061,6 +1078,9 @@ class LiveSession:
             except (KeyboardInterrupt, SystemExit):
                 raise
             except BaseException as e:
+                # Stopped by the learner (Start not pressed / left the Classroom).
+                if getattr(self, "_stopping", False):
+                    break
                 # TaskGroup wraps child exceptions in a BaseExceptionGroup,
                 # which `except Exception` would miss.
                 if _is_reconnect_signal(e):
@@ -1110,3 +1130,6 @@ class LiveSession:
             self.set_speaking(False)
             self.ui.set_state("SLEEPING")
             await asyncio.sleep(self._conn_backoff)
+        self.set_speaking(False)
+        self.ui.set_state("SLEEPING")
+        self._stopping = False

@@ -270,13 +270,18 @@ class App:
         kind = data.get("type")
         ui, live = self.ui, self.live
         if kind in ("start", "restart"):
-            # A page that has just been opened (or reloaded) starts the lesson
-            # again from nothing; a tab that only lost its connection does not.
+            # Start was pressed. A course lesson chosen on the Courses page comes
+            # with it, and is applied BEFORE the session is built.
+            if kind == "start" and (data.get("track") or data.get("lesson") is not None):
+                asyncio.get_running_loop().create_task(self._start_with(data))
+                return
             running = self._session_task is not None and not self._session_task.done()
             if running and (kind == "restart" or data.get("fresh")) and live:
                 live.restart()
             else:
                 self._start_session()
+        elif kind == "stop":
+            self._stop_session()
         elif kind == "text":
             text = str(data.get("text") or "").strip()
             if text and live and live.session:
@@ -333,24 +338,46 @@ class App:
             return
         if message.startswith("Deleted") and "Back to free talk" not in message:
             return                          # another topic was deleted: nothing changes here
+        # A new topic: the lesson stops, and Start begins it in the new topic.
+        self._stop_session()
+
+    async def _start_with(self, data: dict) -> None:
+        """Start, with the course (or course lesson) chosen on the Courses page."""
+        track, lesson = data.get("track"), data.get("lesson")
+        try:
+            if lesson is not None:
+                fn = plugin_fn("goto_lesson")
+                if fn is not None:
+                    await asyncio.to_thread(fn, int(lesson), self.ui)
+            elif track:
+                fn = plugin_fn("set_track")
+                if fn is not None:
+                    await asyncio.to_thread(fn, str(track), self.ui)
+        except Exception as e:
+            self.ui.write_log(f"ERR: could not open the course - {e}")
         running = self._session_task is not None and not self._session_task.done()
-        if running:
+        if running and self.live:
             self.live.restart(new_topic=True)
+        else:
+            self._start_session()
+
+    def _stop_session(self) -> None:
+        """The lesson ends: the teacher is silent until Start is pressed again."""
+        running = self._session_task is not None and not self._session_task.done()
+        if running and self.live:
+            self.live.stop()
+            self._session_task.cancel()
+        self.ui.send({"type": "stopped"})
 
     def _fresh_language(self, ok: bool, message: str) -> None:
-        if not ok or message.startswith("Already") or not self.live:
-            return
-        running = self._session_task is not None and not self._session_task.done()
-        if running:
-            self.live.restart()
+        # Another language: the lesson stops; Start begins it in the new one.
+        if ok and not message.startswith("Already"):
+            self._stop_session()
 
     def _fresh_track(self, ok: bool, message: str) -> None:
-        """Another section or another course lesson: start it from a clean board."""
-        if not ok or message.startswith("Already") or not self.live:
-            return
-        running = self._session_task is not None and not self._session_task.done()
-        if running:
-            self.live.restart(new_topic=True)
+        """Another section or course lesson: the lesson stops until Start."""
+        if ok and not message.startswith("Already"):
+            self._stop_session()
 
     def _plugin_async(self, name: str, *args, report: bool = False, then=None) -> None:
         """Run a tutor-plugin call off the loop (they read and write files). A

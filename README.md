@@ -13,7 +13,7 @@ dialogue, and only then free conversation.
 |---|---|
 | **Languages** | English (A2 → B2) · Slovak (A1 → B1) |
 | **Two ways to learn** | **Lessons** - topics and free talk · **Courses** - a fixed course from zero |
-| **Slovak course** | 30 lessons in 6 weeks, A1 → B1, about 30 steps each |
+| **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · English A2 → B1 sentence builder (20 lessons, 4 weeks) |
 | **Topics** | 13 ready topics + your own, each with its own dictionary and a taught first lesson |
 | **Voice** | real-time two-way audio through the Gemini Live API |
 | **Platform** | Python server + any modern browser · Windows, macOS, Linux |
@@ -48,22 +48,24 @@ python main.py
 ```
 
 `setup.py` installs the dependencies. `main.py` starts LangVis and opens
-http://localhost:8765 (`python main.py --no-open` starts only the server).
+http://localhost:8765 on the **Courses** page (`python main.py --no-open`
+starts only the server).
 
 1. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
    page asks for it.
 2. Open **⚙ Settings**: the language to learn, your own language, the pace
    and how strictly to correct.
-3. Pick the language in the header (🌐 English or Slovak), open **Lesson** or
-   **Courses**, allow the microphone, and talk.
+3. Pick the language in the header (🌐 English or Slovak). Start a course
+   lesson on **Courses**, or open the **Classroom**, pick a topic and press
+   **Start**. Allow the microphone, and talk.
 
 ---
 
 ## Two ways to learn
 
 Everything is switched from the header: the **language** you learn (🌐), the
-**topic** of a lesson, and the pages - **Lesson**, **Courses**, **Dictionary**
-and **Account**.
+**topic** of a lesson, and the pages - **Courses** (the home page),
+**Classroom**, **Dictionary** and **Account**.
 
 ![The language pick in the header](docs/screenshots/01-language.png)
 
@@ -75,8 +77,16 @@ and **Account**.
 | Left of the board | - | the course syllabus, always open |
 | Right of the board | the topic's words | this lesson's words and words to review |
 
-You can switch at any time: the **Courses** tab in the header, or the
-**Lessons / Courses** switch on the Courses page.
+**Start / Continue the lesson** on the Courses page (or a finished lesson's
+tile) opens the Classroom in the course. Choosing a **topic** in the header
+takes you back to the topic lessons.
+
+Nothing starts by itself. The Classroom waits with a **Start** button, and the
+teacher begins only when you press it. Leaving the Classroom, choosing another
+topic, language or course lesson, or losing the connection stops the lesson;
+it waits for **Start** again.
+
+![The Classroom before Start](docs/screenshots/00-start.png)
 
 The **language select** in the header (🌐 `Slovak · A1`, `English · B1`)
 switches the language you are learning. Each language keeps its own level,
@@ -152,15 +162,15 @@ grammar. Grammar belongs to you, not to a topic, so later topics climb faster.
 
 ## Courses - learning from zero
 
-A course is fixed material written for someone who knows **nothing** of the
-language. The teacher follows it exactly, never skips and never jumps ahead,
-and remembers the exact step where you stopped.
+A course is fixed, hand-written material. The teacher follows it exactly,
+never skips and never jumps ahead, and remembers the exact step where you
+stopped. The Courses page shows only the courses of the language chosen in the
+header: Slovak shows the Slovak course, English the English one.
 
 ![The Courses page](docs/screenshots/02-courses.png)
 
-The page shows the languages (Slovak is ready, English is coming), the lesson
-to do now with its words and progress, and the whole course by week. Lessons
-you have finished can be opened again.
+The page shows the course, the lesson to do now with its words and progress,
+and the whole course by week. Lessons you have finished can be opened again.
 
 ### One course lesson
 
@@ -175,7 +185,7 @@ translation, and the word being taught right now is framed.
 | **Phrases** | 5 ready phrases to say |
 | **Grammar** | one rule in simple words, a table on the board, 3 examples to repeat |
 | **Dialogue** | the teacher plays a role, you say your own lines |
-| **Translate** | the teacher says an English sentence, you say it in Slovak yourself |
+| **Translate** / **Build sentences** | Slovak: say an English sentence in Slovak · English: join or upgrade sentences yourself |
 | **Questions for you** | questions about your own life, with a model answer |
 | **Speaking task** | free conversation on the lesson; say "next lesson" to go on |
 
@@ -204,6 +214,25 @@ Translation practice:
 
 In weeks 1-2 everything is explained in simple English; from week 3 in simple
 Slovak. The board always shows the Azerbaijani translation too.
+
+### The English course: a sentence builder, A2 → B1 in 4 weeks
+
+For a learner who already speaks basic English. One aim: longer, more natural
+sentences. Half the lessons teach **linking words**, half teach **phrasal
+verbs**. Instead of translating, you **build sentences**: join two short ones
+with the lesson's linking word, or swap a plain verb for a phrasal verb.
+
+![Building sentences in the English course](docs/screenshots/13-english-course.png)
+
+| Week | Level | Lessons |
+|---|---|---|
+| **1** · Joining ideas | A2 | and, but, or, so · because and so · first, then, after that · when, before, after, while · also, too, as well |
+| **2** · Everyday phrasal verbs | A2 | My day (wake up, go out) · At home (clean up, put away) · People (get on with, grow up) · Plans (look forward to, put off) · A2 checkpoint story |
+| **3** · Longer sentences | B1 | although, however, despite · if, unless, in case · so that, in order to · who, which, where · as a result, thanks to |
+| **4** · Phrasal verbs for fluent talk | B1 | Work (deal with, figure out) · Problems (break down, come up with) · Feelings (fall out, make up) · Travel (check in, pick up) · B1 final |
+
+Everything is explained in simple English, with the Azerbaijani translation of
+every word and phrase on the board.
 
 ---
 
@@ -330,6 +359,7 @@ tutor/
   curriculum.py             English skills, rules, stages; the languages
   slovak.py                 Slovak skills, rules and stages
   intensive_slovak.py       the Slovak course: 30 lessons, A1 → B1
+  intensive_english.py      the English sentence builder: 20 lessons, A2 → B1
   topics.py                 topics, their dictionaries and first lessons
   progress.py               learner state: level, skills, course, dictionary
   analysis.py               transcription and per-sentence analysis
