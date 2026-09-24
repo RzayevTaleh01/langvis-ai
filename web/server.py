@@ -310,6 +310,11 @@ class App:
                                report=True, then=self._fresh_topic)
         elif kind == "skip":
             self._plugin_async("skip_step", ui, report=True)
+        elif kind == "language":
+            # Another language: its own level, course and progress, and a new
+            # lesson in it from the start.
+            self._plugin_async("set_language", str(data.get("value") or "English"),
+                               report=True, then=self._fresh_language)
         elif kind == "track":
             # Normal lessons or the intensive course: a new conversation in it.
             self._plugin_async("set_track", str(data.get("value") or "normal"), ui,
@@ -331,6 +336,13 @@ class App:
         running = self._session_task is not None and not self._session_task.done()
         if running:
             self.live.restart(new_topic=True)
+
+    def _fresh_language(self, ok: bool, message: str) -> None:
+        if not ok or message.startswith("Already") or not self.live:
+            return
+        running = self._session_task is not None and not self._session_task.done()
+        if running:
+            self.live.restart()
 
     def _fresh_track(self, ok: bool, message: str) -> None:
         """Another section or another course lesson: start it from a clean board."""

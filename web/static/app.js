@@ -140,7 +140,8 @@ function renderStatus(s) {
   lvl.append(b, ` · ${s.score}/100 → ${s.goal}`);
   document.body.dataset.track = s.track || "normal";
   const it = s.intensive;
-  $("chip-intensive").textContent = it ? `Kurs · lesson ${it.lesson}/${it.total} · ${it.band}` : "Kurs";
+  $("chip-intensive").textContent = it ? `Course · lesson ${it.lesson}/${it.total} · ${it.band}` : "Course";
+  renderLanguages(s);
   if (it) renderCourseSide(it, act);
   const g = s.grammar || {};
   $("chip-unit").textContent = g.total ? `Grammar · ${g.strong}/${g.total} known · ${g.weak} weak` : "Grammar";
@@ -150,6 +151,47 @@ function renderStatus(s) {
     $("words-head").textContent = s.lexicon_building
       ? `Preparing the words for ${(s.topic || {}).name}… (once only)` : "The topic's words are on their way…";
   }
+}
+
+// The language select: every language with its own level. Choosing one
+// switches the whole lesson - level, course, words - to that language.
+function renderLanguages(s) {
+  const modes = (s.modes || []).filter((m) => m.enabled);
+  const active = modes.find((m) => m.active);
+  if (active) $("lang-name").textContent = active.level ? `${active.name} · ${active.level}` : active.name;
+  const menu = $("lang-menu");
+  const sig = JSON.stringify(modes.map((m) => [m.name, m.level, m.active]));
+  if (menu.dataset.sig === sig) return;
+  menu.dataset.sig = sig;
+  menu.textContent = "";
+  const li = document.createElement("li");
+  const h = document.createElement("h6");
+  h.className = "dropdown-header";
+  h.textContent = "Language to learn";
+  li.append(h);
+  menu.append(li);
+  modes.forEach((m) => {
+    const item = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "dropdown-item" + (m.active ? " active" : "");
+    const name = document.createElement("span");
+    name.textContent = m.name;
+    const lvl = document.createElement("span");
+    lvl.className = "az";
+    lvl.textContent = m.level ? `${m.level} · ${m.score}/100` : "";
+    b.append(name, lvl);
+    b.addEventListener("click", () => { if (!m.active) switchLanguage(m.name); });
+    item.append(b);
+    menu.append(item);
+  });
+}
+function switchLanguage(name) {
+  audio.flush();
+  send({ type: "language", value: name });
+  $("lang-name").textContent = `${name}…`;
+  flash(`Switching to ${name}…`);
+  if (document.body.dataset.page === "courses") setTimeout(() => loadIntensive(act), 900);
 }
 
 // The topic dropdown (Bootstrap): started topics first, then the rest, then
@@ -185,7 +227,7 @@ function renderTopics(s) {
     name.append(t.custom ? `${t.name}` : t.name);
     const az = document.createElement("span");
     az.className = "az";
-    az.textContent = t.custom ? "my topic" : t.az;
+    az.textContent = t.custom ? "my topic" : "";
     a.append(name, az);
     a.addEventListener("click", () => { if (!t.current) send({ type: "topic", id: t.id }); });
     li.append(a);
@@ -654,7 +696,7 @@ function route() {
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("hidden", p.id !== `page-${known}`));
   document.querySelectorAll(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === known));
   // The pages can be read without starting the lesson; only the lesson needs sound.
-  if (known === "lesson" && !choosing) begin();
+  if (known === "lesson") begin();
   if (known === "courses") loadIntensive(act);
   if (known === "dictionary") loadDictionary();
   if (known === "account") loadAccount();
@@ -667,11 +709,11 @@ function goTo(page) {
   else location.hash = `#/${page}`;
 }
 
-// What the Intensive page and the chooser ask for.
+// What the Courses page asks for.
 function act(kind, value) {
   if (kind === "track") {
     sendSoon({ type: "track", value });
-    if (value === "intensive" && document.body.dataset.page === "courses" && !choosing) goTo("lesson");
+    if (value === "intensive" && document.body.dataset.page === "courses") goTo("lesson");
   } else if (kind === "lesson") {
     sendSoon({ type: "intensive_lesson", index: value });
     goTo("lesson");
@@ -680,17 +722,7 @@ function act(kind, value) {
   }
 }
 
-// ── Where to start: normal lessons or the intensive course ─────────────────
-
-let choosing = !["dictionary", "account"].includes((location.hash.replace(/^#\/?/, "") || "lesson").split("?")[0]);
-$("chooser").classList.toggle("hidden", !choosing);
-document.querySelectorAll(".chooser-opt").forEach((b) => b.addEventListener("click", () => {
-  choosing = false;
-  $("chooser").classList.add("hidden");
-  act("track", b.dataset.track);
-  goTo(b.dataset.track === "intensive" ? "courses" : "lesson");
-  if (b.dataset.track === "intensive") setTimeout(() => loadIntensive(act), 600);
-}));
+// The Lessons / Courses switch on the Courses page.
 document.querySelectorAll(".int-switch .seg").forEach((b) => b.addEventListener("click", () => {
   sendSoon({ type: "track", value: b.dataset.track });
   if (b.dataset.track === "normal") goTo("lesson");

@@ -1,4 +1,4 @@
-// The Dictionary and Hesab (account) pages, and the small SVG charts they use.
+// The Courses, Dictionary and Account pages, and the small SVG charts they use.
 
 const $ = (id) => document.getElementById(id);
 const NS = "http://www.w3.org/2000/svg";
@@ -453,7 +453,7 @@ function renderCourseCards(data, act) {
     card.disabled = !c.available;
     card.append(node("strong", "", c.name), node("span", "course-card-lvl", c.levels));
     card.append(node("span", "course-card-meta",
-      c.available ? `${c.lessons} lessons · ${c.weeks} weeks` : "Hazırlanır - coming soon"));
+      c.available ? `${c.lessons} lessons · ${c.weeks} weeks` : "Coming soon"));
     card.addEventListener("click", () => {
       if (!c.available) return;
       act("track", `intensive:${c.key}`);

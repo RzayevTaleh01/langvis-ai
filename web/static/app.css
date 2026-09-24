@@ -787,15 +787,6 @@ body[data-track="intensive"] #chip-unit { display: none; }
 .int-check { color: var(--good); }
 .int-tile-title { font-size: 14px; line-height: 1.35; color: var(--ink-strong); }
 
-.chooser { position: fixed; inset: 0; z-index: 50; background: rgba(35, 32, 26, .45); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.chooser-box { background: var(--panel); border-radius: 16px; padding: 26px; width: min(620px, 100%); box-shadow: 0 20px 60px rgba(0, 0, 0, .2); }
-.chooser-box h2 { margin: 0 0 18px; font: 24px/1.3 var(--serif); color: var(--ink-strong); }
-.chooser-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.chooser-opt { text-align: left; font: inherit; display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); cursor: pointer; color: var(--ink); }
-.chooser-opt strong { font-size: 18px; color: var(--ink-strong); }
-.chooser-opt span { font-size: 14px; color: var(--ink-med); }
-.chooser-opt:hover { border-color: var(--pri); background: var(--pri-ghost); }
-@media (max-width: 560px) { .chooser-options { grid-template-columns: 1fr; } }
 
 /* ── Courses page: the languages ───────────────────────────────────────── */
 .course-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -845,3 +836,8 @@ body[data-track="intensive"] .course-side {
   body[data-track="intensive"] .course-side { max-height: 40vh; order: 3; }
 }
 .word.now { outline: 2px solid var(--pri); background: var(--pri-ghost); }
+
+/* ── The language pick in the header: the same pill as the topic ──────── */
+.lang-menu { min-width: 220px; }
+#lang-name { white-space: nowrap; }
+@media (max-width: 560px) { .lang-drop .topic-icon { display: none; } }

@@ -12,9 +12,17 @@
   <header class="bar">
     <a class="brand" href="#/lesson"><span class="mark">L</span><span>LangVis</span></a>
     <div class="chip" id="chip-level" title="Your measured level">-</div>
-    <a class="chip wide chip-btn chip-intensive" id="chip-intensive" href="#/courses" title="Your course - open the course map">Kurs</a>
+    <a class="chip wide chip-btn chip-intensive" id="chip-intensive" href="#/courses" title="Your course - open the course map">Course</a>
     <button class="chip wide chip-btn" id="chip-unit" type="button" title="The whole grammar syllabus and how well you know each rule">Grammar</button>
     <div class="spacer"></div>
+    <div class="dropdown lang-drop">
+      <button class="topic-pick dropdown-toggle" id="lang-btn" type="button" data-bs-toggle="dropdown"
+              aria-expanded="false" title="The language you are learning - each has its own level and progress">
+        <svg class="topic-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span id="lang-name">Language</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end topic-menu lang-menu" id="lang-menu" aria-labelledby="lang-btn"></ul>
+    </div>
     <div class="dropdown topic-drop">
       <button class="topic-pick dropdown-toggle" id="topic-btn" type="button" data-bs-toggle="dropdown"
               aria-expanded="false" title="What we talk about">
@@ -25,9 +33,9 @@
     </div>
     <nav class="nav">
       <a href="#/lesson" data-page="lesson">Lesson</a>
-      <a href="#/courses" data-page="courses">Kurslar</a>
+      <a href="#/courses" data-page="courses">Courses</a>
       <a href="#/dictionary" data-page="dictionary">Dictionary</a>
-      <a href="#/account" data-page="account">Hesab</a>
+      <a href="#/account" data-page="account">Account</a>
     </nav>
     <button class="icon-btn" id="settings-btn" type="button" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.6h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.8c.1.6.1 1.3 0 1.9l2 1.8-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.8a6 6 0 0 1 0-1.9l-2-1.8 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
@@ -163,12 +171,12 @@
   <!-- ── Courses ─────────────────────────────────────────────────────────── -->
   <main class="page doc hidden" id="page-courses">
     <div class="doc-head">
-      <h1>Kurslar</h1>
+      <h1>Courses</h1>
       <p class="sub">Step-by-step courses from zero, with a teacher who follows the material.</p>
     </div>
     <div class="int-switch" role="group" aria-label="Section">
       <button class="seg" type="button" data-track="normal">Lessons</button>
-      <button class="seg" type="button" data-track="intensive">Kurslar</button>
+      <button class="seg" type="button" data-track="intensive">Courses</button>
     </div>
     <div class="course-cards" id="course-cards"></div>
     <div class="int-course-head">
@@ -216,7 +224,7 @@
   <!-- ── Account ─────────────────────────────────────────────────────────── -->
   <main class="page doc hidden" id="page-account">
     <div class="doc-head">
-      <h1>Hesab</h1>
+      <h1>Account</h1>
       <p class="sub" id="acc-sub"></p>
     </div>
     <div class="stats" id="acc-stats"></div>
@@ -352,23 +360,6 @@
       <h1 id="content-title"></h1>
       <pre class="content" id="content-text"></pre>
       <button class="btn" id="content-close">Close</button>
-    </div>
-  </div>
-
-  <!-- ── Where to start ─────────────────────────────────────────────────── -->
-  <div class="chooser hidden" id="chooser" role="dialog" aria-modal="true" aria-labelledby="chooser-title">
-    <div class="chooser-box">
-      <h2 id="chooser-title">What do you want to do today?</h2>
-      <div class="chooser-options">
-        <button class="chooser-opt" type="button" data-track="normal">
-          <strong>Lessons</strong>
-          <span>Topics and free talk: practise speaking about what you like.</span>
-        </button>
-        <button class="chooser-opt" type="button" data-track="intensive">
-          <strong>Kurslar</strong>
-          <span>Slovak A1 → B1 (30 lessons) and English: step by step with a teacher.</span>
-        </button>
-      </div>
     </div>
   </div>
 

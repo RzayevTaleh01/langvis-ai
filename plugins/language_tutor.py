@@ -2085,6 +2085,23 @@ def _intensive_repeat(player=None) -> str:
             f"the first step: {first} Then STOP and wait.")
 
 
+def _language_level(key: str, lang: dict) -> dict:
+    """Where the learner is in one language, for the language select:
+    "English · B1", "Slovak · A1"."""
+    try:
+        path = _paths(lang)[0]
+        state = pg.load(path) if path.exists() else {}
+        if not state.get("declared_level"):
+            state["declared_level"] = lang.get("start_level") or "A2"
+        band, score, _ = pg.effective_level(state)
+        if key in INTENSIVE_COURSES and str(_setting("track", "normal")) == "intensive" \
+                and key == _mode_key():
+            band = _teach_level(state, lang)
+        return {"level": band, "score": round(score)}
+    except Exception:
+        return {"level": lang.get("start_level") or "", "score": 0}
+
+
 def _intensive_status() -> dict:
     """The course beside the board: every lesson, and the current one's parts
     with the step the learner is on."""
@@ -2641,9 +2658,9 @@ def status_for_ui() -> dict:
             topic = _topic_of(state)
             value["mode"] = lang["name"]
             value["speak"] = _speech_level(state, lang)
-            value["modes"] = [{"name": l["name"], "enabled": l["enabled"],
-                               "active": l["name"] == lang["name"]}
-                              for l in cur.LANGUAGES.values()]
+            value["modes"] = [dict(_language_level(key, l), name=l["name"], key=key,
+                                   enabled=l["enabled"], active=l["name"] == lang["name"])
+                              for key, l in cur.LANGUAGES.items()]
             value["topic"] = {"id": topic["id"], "name": topic["name"],
                               "az": topic.get("az", topic["name"])}
             value["topics"] = _topics_list(state)

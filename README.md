@@ -12,7 +12,7 @@ dialogue, and only then free conversation.
 | | |
 |---|---|
 | **Languages** | English (A2 → B2) · Slovak (A1 → B1) |
-| **Two ways to learn** | **Lessons** - topics and free talk · **Kurslar** - a fixed course from zero |
+| **Two ways to learn** | **Lessons** - topics and free talk · **Courses** - a fixed course from zero |
 | **Slovak course** | 30 lessons in 6 weeks, A1 → B1, about 30 steps each |
 | **Topics** | 13 ready topics + your own, each with its own dictionary and a taught first lesson |
 | **Voice** | real-time two-way audio through the Gemini Live API |
@@ -25,10 +25,10 @@ dialogue, and only then free conversation.
 - [Quick start](#quick-start)
 - [Two ways to learn](#two-ways-to-learn)
 - [Lessons - topics and free talk](#lessons---topics-and-free-talk)
-- [Kurslar - courses from zero](#kurslar---courses-from-zero)
+- [Courses - learning from zero](#courses---learning-from-zero)
 - [How one sentence is checked](#how-one-sentence-is-checked)
 - [Hearing a beginner](#hearing-a-beginner)
-- [Dictionary and Hesab](#dictionary-and-hesab)
+- [Dictionary and Account](#dictionary-and-account)
 - [Languages and explanations](#languages-and-explanations)
 - [What is saved](#what-is-saved)
 - [Project structure](#project-structure)
@@ -54,17 +54,20 @@ http://localhost:8765 (`python main.py --no-open` starts only the server).
    page asks for it.
 2. Open **⚙ Settings**: the language to learn, your own language, the pace
    and how strictly to correct.
-3. Choose **Lessons** or **Kurslar**, allow the microphone, and talk.
+3. Pick the language in the header (🌐 English or Slovak), open **Lesson** or
+   **Courses**, allow the microphone, and talk.
 
 ---
 
 ## Two ways to learn
 
-Every time you open LangVis it asks what you want to do today.
+Everything is switched from the header: the **language** you learn (🌐), the
+**topic** of a lesson, and the pages - **Lesson**, **Courses**, **Dictionary**
+and **Account**.
 
-![Lessons or Kurslar](docs/screenshots/01-start.png)
+![The language pick in the header](docs/screenshots/01-language.png)
 
-| | **Lessons** | **Kurslar** |
+| | **Lessons** | **Courses** |
 |---|---|---|
 | For | practising a language you already speak a little | starting a language from zero |
 | What leads | the topic you pick | the course material, lesson by lesson |
@@ -72,8 +75,13 @@ Every time you open LangVis it asks what you want to do today.
 | Left of the board | - | the course syllabus, always open |
 | Right of the board | the topic's words | this lesson's words and words to review |
 
-You can switch at any time: the **Kurslar** tab in the header, or the
-**Lessons / Kurslar** switch on the Kurslar page.
+You can switch at any time: the **Courses** tab in the header, or the
+**Lessons / Courses** switch on the Courses page.
+
+The **language select** in the header (🌐 `Slovak · A1`, `English · B1`)
+switches the language you are learning. Each language keeps its own level,
+course position, words and history, so the header, the board and every page
+change to that language's progress at once.
 
 ---
 
@@ -142,13 +150,13 @@ grammar. Grammar belongs to you, not to a topic, so later topics climb faster.
 
 ---
 
-## Kurslar - courses from zero
+## Courses - learning from zero
 
 A course is fixed material written for someone who knows **nothing** of the
 language. The teacher follows it exactly, never skips and never jumps ahead,
 and remembers the exact step where you stopped.
 
-![The Kurslar page](docs/screenshots/02-courses.png)
+![The Courses page](docs/screenshots/02-courses.png)
 
 The page shows the languages (Slovak is ready, English is coming), the lesson
 to do now with its words and progress, and the whole course by week. Lessons
@@ -244,7 +252,7 @@ Beginner speech is slow and has an accent, so LangVis helps the listening side:
 
 ---
 
-## Dictionary and Hesab
+## Dictionary and Account
 
 ### Dictionary
 
@@ -260,13 +268,13 @@ is kept for good, with how often and on how many **different days** you used it.
 | learned | used on 3+ different days | after 7 or 14 days |
 | strong | used on 5+ different days | every 30 days, forever |
 
-### Hesab - your account
+### Account
 
 Your level over time, dictionary growth, mistakes per day and where the
 mistakes are, the grammar syllabus with your mastery of every rule, how far
 every topic has come, and every correction ever made.
 
-![Hesab](docs/screenshots/12-account.png)
+![Account](docs/screenshots/12-account.png)
 
 ---
 
@@ -309,7 +317,7 @@ web/
     index.html · app.css
     app.js                  socket, header, pages, chooser, settings
     board.js                the board and the tutor's walk across it
-    pages.js                Kurslar, Dictionary and Hesab pages, the course syllabus
+    pages.js                Courses, Dictionary and Account pages, the course syllabus
     tutor.js · diagrams.js  the LangVis face and the grammar pictures
     audio.js · mic-worklet.js
 
@@ -342,7 +350,7 @@ memory/ · config/           settings, memory and your local API key
 Write a file like `tutor/intensive_slovak.py`: a list of lessons, each with
 words, phrases, one grammar point, a dialogue, translations, questions and a
 speaking task. Register it in `INTENSIVE_COURSES` in
-`plugins/language_tutor.py` and it appears on the Kurslar page.
+`plugins/language_tutor.py` and it appears on the Courses page.
 
 ### Plugins
 
