@@ -38,10 +38,14 @@ HOW IT IS TAUGHT
     the lesson has a method and not only a topic.
 
 LANGUAGES
-    English is the only active course. Slovak is declared so the mode exists in
-    settings and on screen, but it is disabled until its curriculum is written.
+    English (A2 to B2) and Slovak (A1 to B2, in tutor/slovak.py). Each language
+    also says where a new learner starts, which language explains the rules,
+    and the phrases the tutor says around the board.
 """
 from __future__ import annotations
+
+from tutor.slovak import (SLOVAK_BOARD, SLOVAK_PHRASES, SLOVAK_RULES, SLOVAK_SKILLS,
+                          SLOVAK_STAGES, SLOVAK_TIPS)
 
 UNIT_MIN_PRACTICE = 12     # substantial sentences spoken while the unit is active
 SKILL_PASS        = 70     # mastery a target skill needs to pass the unit
@@ -841,6 +845,30 @@ LEGACY_TOPIC_MAP: dict[str, str] = {
 }
 
 
+# What the tutor says aloud around the board, in English.
+ENGLISH_PHRASES = {
+    "did_you_mean": "Did you mean:",
+    "say_it": "Say it.",
+    "now_say_it": "Now say it:",
+    "now_you_say_it": "Now you say it.",
+    "good": "Good.",
+    "better": "Better:",
+    "again": "Again:",
+    "look": "Look at the board.",
+    "form": "The form:",
+    "so_not": "So not \"{wrong}\" - we say \"{right}\".",
+    "for_example": "For example:",
+    "practise": "Let's practise.",
+    "in_lang": "In English:",
+    "timeline": "On the time line:",
+    "then": ", then ",
+    "left": "On the left",
+    "right": "On the right",
+    "leads_to": " leads to ",
+    "becomes": "becomes",
+    "fix_picture": "In your sentence, \"{bad}\" is the wrong block - it becomes \"{good}\".",
+}
+
 LANGUAGES: dict[str, dict] = {
     "english": {
         "name": "English",
@@ -848,14 +876,22 @@ LANGUAGES: dict[str, dict] = {
         "data_dir": "english",
         "skills": ENGLISH_SKILLS,
         "stages": ENGLISH_STAGES,
+        "start_level": "A2",
+        "explain_in": "English",
+        "phrases": ENGLISH_PHRASES,
     },
-    # Declared so the mode exists; switched on once its course is written.
     "slovak": {
         "name": "Slovak",
-        "enabled": False,
+        "enabled": True,
         "data_dir": "slovak",
-        "skills": {},
-        "stages": [],
+        "skills": SLOVAK_SKILLS,
+        "stages": SLOVAK_STAGES,
+        "start_level": "A1",
+        # A1 is explained in simple English - a beginner cannot follow Slovak
+        # explanations yet. From A2 on, everything is in simple Slovak.
+        "explain_in": "Slovak",
+        "explain_by_band": {"A1": "English"},
+        "phrases": SLOVAK_PHRASES,
     },
 }
 
@@ -1139,6 +1175,10 @@ for _sid in ("present_simple", "questions", "articles", "plurals_quantity",
     _name, _band, _hint = ENGLISH_SKILLS[_sid]
     ENGLISH_SKILLS[_sid] = (_name, "A1", _hint)
 
+# The Slovak course's rules, examples and pictures share the same tables.
+SKILL_TIPS.update(SLOVAK_TIPS)
+SKILL_BOARD.update(SLOVAK_BOARD)
+
 SYLLABUS_BANDS = ("A1", "A2", "B1", "B2")
 
 
@@ -1232,6 +1272,9 @@ SIMPLE_RULES: dict[str, str] = {
     "past_modals": "Should have done: it was a mistake not to do it.",
     "future_in_past": "Was going to: a plan in the past that did not happen.",
 }
+
+
+SIMPLE_RULES.update(SLOVAK_RULES)
 
 
 def simple_rule(sid: str) -> str:

@@ -56,7 +56,8 @@ ECHO_TAIL = 2.5                   # s after it ends: a sentence starting now is 
 OPENING_WAIT = 25.0               # s the mic waits at most for the greeting to be spoken
 SEND_CHUNK = 4096                 # bytes per audio message when a finished sentence is sent
 REPLY_WAIT = 8.0                  # s the mic stays closed while the released reply arrives
-GATE_TIMEOUT = 9.0                # s of thinking before the tutor is let answer on its own
+GATE_TIMEOUT = 14.0               # s of thinking before the tutor is let answer on its own
+ECHO_GAP = 0.9                    # s after the tutor's voice ends: a sentence starting later is the learner
 
 
 _key_turn = 0      # which key the voice session uses: the next after a spent one
@@ -113,7 +114,7 @@ def _plugin_value(name: str, empty):
 _CTRL_RE = re.compile(r"<ctrl\d+>", re.IGNORECASE)
 # The tags of the system's notes. Now and then the model reads one out; the
 # page and the transcript never show it.
-_TAG_RE = re.compile(r"\[(?:NEXT|SKIP|EXPLAIN|FLUENCY|MISHEARD|LESSON_START|TUTOR_[A-Z_]+)\]\s*")
+_TAG_RE = re.compile(r"\[(?:NEXT|SKIP|EXPLAIN|FLUENCY|MISHEARD|BOARD|LESSON_START|TUTOR_[A-Z_]+)\]\s*")
 
 
 def _clean_transcript(text: str) -> str:
@@ -337,6 +338,8 @@ class LiveSession:
         self._open_at = 0.0            # the greeting is on its way: mic closed until then
         self._you_logged = False       # the learner's line of this turn is already written
         self._utt_barge = False        # the sentence being heard began over (or just after) the tutor's voice
+        self._utt_gap = -1.0           # s between the tutor's voice ending and the sentence starting (-1: over it)
+        self._speech_end = 0.0
         self._echo_until = 0.0         # the speakers may still be playing the tutor's last words
         self._tutor_text = ""          # what the tutor said lately - to recognise its echo
         self._turn_spoke = False       # the tutor's current turn has already made a sound
@@ -491,6 +494,7 @@ class LiveSession:
             # The browser plays a little behind the server, and the room rings:
             # its last words can reach the mic after the server thinks it stopped.
             self._echo_until = time.monotonic() + ECHO_TAIL
+            self._speech_end = time.monotonic()
             self._open_at = 0.0             # the greeting (or any turn) is over
         if value:
             self._reply_until = 0.0
@@ -526,6 +530,7 @@ class LiveSession:
         event = self._vad.feed(np.frombuffer(pcm16k, dtype=np.int16), barge=barge)
         if event == "start":
             self._utt_barge = barge or now < self._echo_until
+            self._utt_gap = -1.0 if speaking else now - self._speech_end
             if speaking:
                 self.interrupt()
                 self.ui.write_log("SYS: You cut in - the tutor stopped to listen.")
@@ -574,8 +579,12 @@ class LiveSession:
         if gate is not None:
             self.ui.set_state("THINKING")
             try:
+                # The echo is judged inside the gate, BEFORE the lesson moves on;
+                # past the deadline the gate changes nothing.
                 decided = await asyncio.wait_for(
-                    asyncio.to_thread(gate, utterance, seconds, self.ui), timeout=GATE_TIMEOUT) or {}
+                    asyncio.to_thread(gate, utterance, seconds, self.ui, self._echo_of,
+                                      time.monotonic() + GATE_TIMEOUT - 0.5),
+                    timeout=GATE_TIMEOUT) or {}
                 if decided.get("drop"):
                     # Nothing was said - noise, or the tutor's own voice.
                     self.ui.set_state("LISTENING")
@@ -584,7 +593,7 @@ class LiveSession:
                 note = decided.get("note")
                 handled = bool(decided.get("handled")) or note is not None
                 heard = str(decided.get("text") or "").strip()
-                if heard and self._utt_barge and self._is_echo(heard):
+                if heard and not decided.get("handled") and self._echo_of(heard):
                     # It began over the tutor's voice and is the tutor's own
                     # words: its echo, not the learner.
                     print(f"[LangVis] echo dropped: {heard[:60]}")
@@ -614,10 +623,18 @@ class LiveSession:
         self._queue({"activity": "end"})
         self._reply_until = time.monotonic() + REPLY_WAIT
 
+    def _echo_of(self, heard: str) -> bool:
+        """The tutor's own voice coming back: a sentence that began over its
+        voice, or in the first moment after it, made of its words. A learner
+        repeating "Say it: prosím" starts later - and says the same words."""
+        if not self._utt_barge or self._utt_gap >= ECHO_GAP:
+            return False
+        return self._is_echo(heard)
+
     def _is_echo(self, heard: str) -> bool:
         """Nearly every word of it was in what the tutor was just saying."""
-        said = re.findall(r"[a-z']+", heard.lower())
-        tutor = set(re.findall(r"[a-z']+", self._tutor_text.lower()))
+        said = re.findall(r"[^\W\d_']+", heard.lower())
+        tutor = set(re.findall(r"[^\W\d_']+", self._tutor_text.lower()))
         if not said or not tutor:
             return False
         return sum(w in tutor for w in said) / len(said) >= 0.8
@@ -924,7 +941,8 @@ class LiveSession:
 
         new_topic, self._new_topic = self._new_topic, False
         # A topic just chosen is a new conversation: no recap of the last one.
-        last = None if new_topic else await asyncio.to_thread(pop_last_session)
+        language = _plugin_value("language_name", "English")
+        last = None if new_topic else await asyncio.to_thread(pop_last_session, language)
         recap = ""
         if last:
             try:
@@ -954,6 +972,25 @@ class LiveSession:
                   "sentences in total. Do not call any tools. Do not read this "
                   "instruction aloud and never mention the plan itself."
             )
+        # A beginner pauses between words: the sentence ends after a longer quiet.
+        pause = plugin_fn("end_silence")
+        if pause is not None:
+            try:
+                self._vad.END_SILENCE = float(await asyncio.to_thread(pause))
+            except Exception:
+                pass
+        # A topic not taught yet opens with its taught part: words, a dialogue,
+        # sentence frames - the tutor teaches before it asks.
+        opening = plugin_fn("opening_note")
+        if opening is not None:
+            try:
+                note = await asyncio.to_thread(opening, self.ui)
+                if note:
+                    prompt = note
+            except Exception as e:
+                print(f"[LangVis] opening lesson failed: {e}")
+        if not self.session:
+            return
         self._expect_reply()
         await self.session.send_client_content(
             turns={"role": "user", "parts": [{"text": prompt}]}, turn_complete=True)
@@ -974,7 +1011,7 @@ class LiveSession:
                                            model="gemini-flash-lite-latest", contents=prompt)
             summary = (getattr(resp, "text", "") or "").strip()
             if summary:
-                save_session_summary(summary[:280], "English")
+                save_session_summary(summary[:280], _plugin_value("language_name", "English"))
         except Exception as e:
             print(f"[Memory] ⚠️ Lesson summary failed: {e}")
 

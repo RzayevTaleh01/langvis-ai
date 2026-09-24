@@ -2,7 +2,7 @@
 import { Audio } from "/static/audio.js";
 import { TutorFace, TutorWalker } from "/static/tutor.js";
 import { Board } from "/static/board.js";
-import { loadAccount, loadDictionary } from "/static/pages.js";
+import { loadAccount, loadDictionary, loadIntensive, renderCourseSide } from "/static/pages.js";
 
 const $ = (id) => document.getElementById(id);
 const audio = new Audio();
@@ -26,6 +26,7 @@ function connect() {
   ws.binaryType = "arraybuffer";
   // After a lost connection the lesson simply carries on.
   ws.onopen = () => {
+    pending.splice(0).forEach(send);
     if (!started) return;
     send({ type: "start", fresh: freshStart });
     freshStart = false;
@@ -44,6 +45,13 @@ function connect() {
 
 function send(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+// A choice made before the socket is open is sent as soon as it opens.
+const pending = [];
+function sendSoon(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) send(obj);
+  else pending.push(obj);
 }
 
 // The microphone always goes to the server, which decides: the learner may cut
@@ -130,6 +138,10 @@ function renderStatus(s) {
   const b = document.createElement("strong");
   b.textContent = s.level;
   lvl.append(b, ` · ${s.score}/100 → ${s.goal}`);
+  document.body.dataset.track = s.track || "normal";
+  const it = s.intensive;
+  $("chip-intensive").textContent = it ? `Kurs · lesson ${it.lesson}/${it.total} · ${it.band}` : "Kurs";
+  if (it) renderCourseSide(it, act);
   const g = s.grammar || {};
   $("chip-unit").textContent = g.total ? `Grammar · ${g.strong}/${g.total} known · ${g.weak} weak` : "Grammar";
   renderTopics(s);
@@ -266,7 +278,7 @@ function renderCoaching(card) {
 function wordRow(it, onClick) {
   const li = document.createElement("li");
   li.tabIndex = 0;
-  li.className = "word s" + it.stage;
+  li.className = "word s" + it.stage + (it.now ? " now" : "");
   const top = document.createElement("div");
   top.className = "word-top";
   const t = document.createElement("span");
@@ -302,12 +314,16 @@ function renderWords(card) {
   const deck = card.deck || {};
   const items = deck.items || [];
   const lex = card.lexis || {};
+  document.querySelector('.tab[data-tab="words"]').textContent = deck.intensive ? "Lesson words" : "Topic words";
+  $("due-label").textContent = deck.intensive ? "From earlier lessons - review" : "Old words - use them again";
   if (items.length) {
     const learned = items.filter((i) => i.stage >= 3).length;
-    $("words-head").textContent = `${deck.tier} words for this topic · ${learned}/${items.length} learned`
-      + ` · ${(lex.learned || 0) + (lex.strong || 0)} learned in all topics`;
+    $("words-head").textContent = deck.intensive
+      ? `${deck.tier} · ${deck.title} · ${items.length} words and phrases`
+      : `${deck.tier} words for this topic · ${learned}/${items.length} learned`
+        + ` · ${(lex.learned || 0) + (lex.strong || 0)} learned in all topics`;
   }
-  const sig = JSON.stringify([items.map((i) => [i.text, i.uses, i.days]), (card.due || []).map((i) => i.text)]);
+  const sig = JSON.stringify([items.map((i) => [i.text, i.uses, i.days, i.now]), (card.due || []).map((i) => i.text)]);
   if (renderWords.sig === sig) return;
   renderWords.sig = sig;
   const list = $("words");
@@ -631,18 +647,55 @@ function addLog(text) {
 // ── Pages ───────────────────────────────────────────────────────────────────
 
 function route() {
-  const page = (location.hash.replace(/^#\/?/, "") || "lesson").split("?")[0];
-  const known = ["lesson", "dictionary", "account"].includes(page) ? page : "lesson";
+  let page = (location.hash.replace(/^#\/?/, "") || "lesson").split("?")[0];
+  if (page === "intensive") page = "courses";
+  const known = ["lesson", "courses", "dictionary", "account"].includes(page) ? page : "lesson";
   document.body.dataset.page = known;
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("hidden", p.id !== `page-${known}`));
   document.querySelectorAll(".nav a").forEach((a) => a.classList.toggle("active", a.dataset.page === known));
   // The pages can be read without starting the lesson; only the lesson needs sound.
-  if (known === "lesson") begin();
+  if (known === "lesson" && !choosing) begin();
+  if (known === "courses") loadIntensive(act);
   if (known === "dictionary") loadDictionary();
   if (known === "account") loadAccount();
   if (known === "lesson") requestAnimationFrame(() => walker.reflow());
 }
 window.addEventListener("hashchange", route);
+
+function goTo(page) {
+  if (location.hash === `#/${page}`) route();
+  else location.hash = `#/${page}`;
+}
+
+// What the Intensive page and the chooser ask for.
+function act(kind, value) {
+  if (kind === "track") {
+    sendSoon({ type: "track", value });
+    if (value === "intensive" && document.body.dataset.page === "courses" && !choosing) goTo("lesson");
+  } else if (kind === "lesson") {
+    sendSoon({ type: "intensive_lesson", index: value });
+    goTo("lesson");
+  } else if (kind === "open") {
+    goTo("lesson");
+  }
+}
+
+// ── Where to start: normal lessons or the intensive course ─────────────────
+
+let choosing = !["dictionary", "account"].includes((location.hash.replace(/^#\/?/, "") || "lesson").split("?")[0]);
+$("chooser").classList.toggle("hidden", !choosing);
+document.querySelectorAll(".chooser-opt").forEach((b) => b.addEventListener("click", () => {
+  choosing = false;
+  $("chooser").classList.add("hidden");
+  act("track", b.dataset.track);
+  goTo(b.dataset.track === "intensive" ? "courses" : "lesson");
+  if (b.dataset.track === "intensive") setTimeout(() => loadIntensive(act), 600);
+}));
+document.querySelectorAll(".int-switch .seg").forEach((b) => b.addEventListener("click", () => {
+  sendSoon({ type: "track", value: b.dataset.track });
+  if (b.dataset.track === "normal") goTo("lesson");
+  else setTimeout(() => loadIntensive(act), 600);
+}));
 
 // ── Controls ────────────────────────────────────────────────────────────────
 

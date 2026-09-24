@@ -12,6 +12,7 @@
   <header class="bar">
     <a class="brand" href="#/lesson"><span class="mark">L</span><span>LangVis</span></a>
     <div class="chip" id="chip-level" title="Your measured level">-</div>
+    <a class="chip wide chip-btn chip-intensive" id="chip-intensive" href="#/courses" title="Your course - open the course map">Kurs</a>
     <button class="chip wide chip-btn" id="chip-unit" type="button" title="The whole grammar syllabus and how well you know each rule">Grammar</button>
     <div class="spacer"></div>
     <div class="dropdown topic-drop">
@@ -24,6 +25,7 @@
     </div>
     <nav class="nav">
       <a href="#/lesson" data-page="lesson">Lesson</a>
+      <a href="#/courses" data-page="courses">Kurslar</a>
       <a href="#/dictionary" data-page="dictionary">Dictionary</a>
       <a href="#/account" data-page="account">Hesab</a>
     </nav>
@@ -34,6 +36,15 @@
 
   <!-- ── Lesson ──────────────────────────────────────────────────────────── -->
   <main class="page stage" id="page-lesson">
+    <aside class="course-side" id="course-side" aria-label="Course syllabus">
+      <div class="course-side-head">
+        <a class="course-side-title" id="cs-course" href="#/courses"></a>
+        <div class="course-side-now" id="cs-now"></div>
+        <div class="int-bar"><span id="cs-bar"></span></div>
+        <ol class="cs-sections" id="cs-sections"></ol>
+      </div>
+      <div class="course-side-list" id="cs-list"></div>
+    </aside>
     <section class="board" id="board" aria-label="Board">
       <div class="board-top">
       <div class="board-head">
@@ -147,6 +158,25 @@
         Interrupt</button>
       </div>
     </footer>
+  </main>
+
+  <!-- ── Courses ─────────────────────────────────────────────────────────── -->
+  <main class="page doc hidden" id="page-courses">
+    <div class="doc-head">
+      <h1>Kurslar</h1>
+      <p class="sub">Step-by-step courses from zero, with a teacher who follows the material.</p>
+    </div>
+    <div class="int-switch" role="group" aria-label="Section">
+      <button class="seg" type="button" data-track="normal">Lessons</button>
+      <button class="seg" type="button" data-track="intensive">Kurslar</button>
+    </div>
+    <div class="course-cards" id="course-cards"></div>
+    <div class="int-course-head">
+      <h2 id="int-title"></h2>
+      <p class="sub" id="int-sub"></p>
+    </div>
+    <section class="card int-now" id="int-now"></section>
+    <div class="int-weeks" id="int-weeks"></div>
   </main>
 
   <!-- ── Dictionary ──────────────────────────────────────────────────────── -->
@@ -322,6 +352,23 @@
       <h1 id="content-title"></h1>
       <pre class="content" id="content-text"></pre>
       <button class="btn" id="content-close">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Where to start ─────────────────────────────────────────────────── -->
+  <div class="chooser hidden" id="chooser" role="dialog" aria-modal="true" aria-labelledby="chooser-title">
+    <div class="chooser-box">
+      <h2 id="chooser-title">What do you want to do today?</h2>
+      <div class="chooser-options">
+        <button class="chooser-opt" type="button" data-track="normal">
+          <strong>Lessons</strong>
+          <span>Topics and free talk: practise speaking about what you like.</span>
+        </button>
+        <button class="chooser-opt" type="button" data-track="intensive">
+          <strong>Kurslar</strong>
+          <span>Slovak A1 → B1 (30 lessons) and English: step by step with a teacher.</span>
+        </button>
+      </div>
     </div>
   </div>
 

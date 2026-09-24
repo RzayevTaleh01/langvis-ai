@@ -374,3 +374,130 @@ export function renderMistakes() {
 }
 
 document.getElementById("mis-skill").addEventListener("input", renderMistakes);
+
+
+// ── Intensive course ────────────────────────────────────────────────────────
+// The course map: four weeks of lessons, the one to do now on top. `act` is
+// how the page talks to the server: act("track", "intensive"), act("lesson", 3).
+
+export async function loadIntensive(act) {
+  const data = await fetch("/api/intensive").then((r) => r.json()).catch(() => null);
+  const now = $("int-now"), weeks = $("int-weeks");
+  now.textContent = "";
+  weeks.textContent = "";
+  document.querySelectorAll(".int-switch .seg").forEach((b) =>
+    b.classList.toggle("active", (b.dataset.track === "intensive") === !!(data && data.active)));
+  if (!data || data.error) {
+    $("int-sub").textContent = "The course could not be loaded.";
+    return;
+  }
+  renderCourseCards(data, act);
+  if (!data.available) {
+    $("int-title").textContent = "";
+    $("int-sub").textContent = "";
+    now.append(node("p", "", `There is no course for ${data.language} yet - choose one above.`));
+    return;
+  }
+  $("int-title").textContent = data.title;
+  const pct = Math.round((100 * data.done) / data.total);
+  $("int-sub").textContent = `${data.done} of ${data.total} lessons done · ${pct}%`;
+
+  const cur = data.lessons[data.current];
+  const going = data.step > 0;
+  now.append(node("div", "int-now-kicker", `Lesson ${cur.index + 1} · week ${cur.week}, day ${cur.day} · ${cur.band}`));
+  now.append(node("h2", "int-now-title", cur.title));
+  now.append(node("p", "int-now-goal", `After it you can ${cur.goal}.`));
+  const words = node("div", "int-words");
+  cur.words.forEach((w) => words.append(node("span", "int-word", w)));
+  now.append(words);
+  const bar = node("div", "int-bar");
+  const fill = node("span");
+  fill.style.width = `${Math.round((100 * data.step) / Math.max(1, data.steps))}%`;
+  bar.append(fill);
+  if (going) now.append(bar, node("p", "int-step", `Step ${data.step + 1} of ${data.steps}`));
+  const go = node("button", "btn primary", going ? "Continue the lesson" : "Start the lesson");
+  go.type = "button";
+  go.addEventListener("click", () => act(data.active ? "open" : "track", "intensive"));
+  now.append(go);
+
+  data.weeks.forEach((wk) => {
+    const sec = node("section", "int-week");
+    const head = node("div", "int-week-head");
+    head.append(node("h3", "", `Week ${wk.week} · ${wk.title}`), node("span", "badge lvl", wk.band));
+    sec.append(head);
+    const grid = node("div", "int-grid");
+    data.lessons.filter((l) => l.week === wk.week).forEach((l) => {
+      const tile = node("button", `int-tile ${l.state}`);
+      tile.type = "button";
+      tile.disabled = !l.open;
+      tile.title = l.open ? l.goal : "Finish the lessons before it first";
+      const top = node("span", "int-tile-top", `${l.index + 1}`);
+      if (l.state === "done") top.append(node("span", "int-check", " ✓"));
+      tile.append(top, node("span", "int-tile-title", l.title));
+      tile.addEventListener("click", () => { if (l.open) act("lesson", l.index); });
+      grid.append(tile);
+    });
+    sec.append(grid);
+    weeks.append(sec);
+  });
+}
+
+// The languages on the Courses page: the one being learned is marked, one
+// without a course yet says so.
+function renderCourseCards(data, act) {
+  const host = $("course-cards");
+  host.textContent = "";
+  (data.courses || []).forEach((c) => {
+    const card = node("button", "course-card" + (c.current && data.available ? " current" : ""));
+    card.type = "button";
+    card.disabled = !c.available;
+    card.append(node("strong", "", c.name), node("span", "course-card-lvl", c.levels));
+    card.append(node("span", "course-card-meta",
+      c.available ? `${c.lessons} lessons · ${c.weeks} weeks` : "Hazırlanır - coming soon"));
+    card.addEventListener("click", () => {
+      if (!c.available) return;
+      act("track", `intensive:${c.key}`);
+      setTimeout(() => loadIntensive(act), 700);
+    });
+    host.append(card);
+  });
+}
+
+// ── The course beside the board ─────────────────────────────────────────────
+
+export function renderCourseSide(it, act) {
+  if (!it) return;
+  $("cs-course").textContent = it.course;
+  $("cs-now").textContent = "";
+  $("cs-now").append(node("span", "cs-kicker", `Lesson ${it.lesson} of ${it.total} · ${it.band}`),
+                     node("strong", "", it.title));
+  $("cs-bar").style.width = `${Math.round((100 * it.step) / Math.max(1, it.steps))}%`;
+  const secs = $("cs-sections");
+  secs.textContent = "";
+  it.sections.forEach((sec) => {
+    const here = it.step >= sec.start && it.step < sec.start + sec.count;
+    const past = it.step >= sec.start + sec.count;
+    const li = node("li", here ? "here" : past ? "past" : "");
+    li.append(node("span", "", sec.label),
+              node("span", "cs-count", here ? `${it.step - sec.start + 1}/${sec.count}` : past ? "✓" : `${sec.count}`));
+    secs.append(li);
+  });
+  const list = $("cs-list");
+  const sig = JSON.stringify(it.lessons.map((l) => l.state));
+  if (list.dataset.sig === sig) return;
+  list.dataset.sig = sig;
+  list.textContent = "";
+  it.weeks.forEach((wk) => {
+    list.append(node("div", "cs-week", `Week ${wk.week} · ${wk.band}`));
+    it.lessons.filter((l) => l.week === wk.week).forEach((l) => {
+      const b = node("button", `cs-lesson ${l.state}`);
+      b.type = "button";
+      b.disabled = !l.open;
+      b.append(node("span", "cs-num", l.state === "done" ? "✓" : `${l.index + 1}`), node("span", "", l.title));
+      b.addEventListener("click", () => { if (l.open && l.state !== "current") act("lesson", l.index); });
+      list.append(b);
+    });
+  });
+  const cur = list.querySelector(".cs-lesson.current");
+  if (cur) cur.scrollIntoView({ block: "center" });
+}

@@ -7,9 +7,10 @@ const $ = (id) => document.getElementById(id);
 const MODE_TEXT = {
   correct: "Correcting", better: "Better version · one level up", again: "Try again",
   explain: "Grammar explain", talk: "Conversation", fluency: "Fluency · talk freely",
+  teach: "Lesson · listen and repeat",
 };
 const CIRCLED = ["①", "②", "③", "④", "⑤"];
-const KIND = { phrasal: "phrasal verb", collocation: "collocation", word: "better word", expression: "expression" };
+const KIND = { phrasal: "phrasal verb", collocation: "collocation", word: "better word", expression: "expression", lesson: "lesson" };
 
 function norm(s) {
   return String(s || "").toLowerCase().replace(/[^\p{L}\p{N}']+/gu, "");
@@ -380,16 +381,17 @@ export class Board {
       if (!L || $("lesson-block").classList.contains("hidden")) return;
       const lane = $("lesson-block");
       steps.push({ el: L.title, lane, say: bubble(L.card.title, L.card.rule),
-                   keys: ["look at the board", words(L.card.title), words(L.card.rule).slice(0, 18)] });
+                   keys: ["look at the board", "pozri sa na tabuľu", words(L.card.title), words(L.card.rule).slice(0, 18)] });
       L.formula.forEach((f, i) => steps.push({ el: f, lane, say: bubble("The form:", f.textContent),
-                                               keys: i ? [words(f.textContent).slice(0, 14)] : ["the form", words(f.textContent).slice(0, 14)] }));
+                                               keys: i ? [words(f.textContent).slice(0, 14)] : ["the form", "tvar", words(f.textContent).slice(0, 14)] }));
       if (L.pieces.length) {
         steps.push({ el: $("lesson-diagram"), lane, say: bubble("Look:", "the picture shows what it means."),
-                     keys: ["time line", "timeline", "on the left", "on the right", "leads to", "becomes", "picture"] });
+                     keys: ["time line", "timeline", "on the left", "on the right", "leads to", "becomes", "picture",
+                            "časovej osi", "vľavo", "vpravo", "vedie k", "zlý blok"] });
       }
       if (L.examples.length) {
         steps.push({ el: L.examples[0], lane, say: bubble("Use it like this:", L.examples[0].textContent),
-                     keys: ["for example", "so not", "we say", "use it like"] });
+                     keys: ["for example", "so not", "we say", "use it like", "napríklad", "takže nie"] });
       }
     };
     if (mode === "correct") {
@@ -397,23 +399,23 @@ export class Board {
         const at = document.querySelector(`#said [data-fix="${i}"]`) || document.querySelector("#said .bad");
         steps.push({ el: at, lane: $("said-block"),
                      say: bubble(`${CIRCLED[i] || "•"} ${f.skill}`, `${f.wrong} → ${f.right}`, f.why),
-                     keys: ["did you mean"] });
+                     keys: ["did you mean", "správne je"] });
       });
       lessonSteps();
       if (p.card && !p.card.clean && p.card.corrected) {
         steps.push({ el: document.querySelector("#fixed .good") || $("fixed"), lane: $("fixed-block"),
-                     say: bubble("Say it:", p.card.corrected), keys: ["now say it", "say it:"] });
+                     say: bubble("Say it:", p.card.corrected), keys: ["now say it", "say it:", "povedz to"] });
       }
     } else if (mode === "better") {
       (p.enrich || []).forEach((e, i) => {
         steps.push({ el: (p.newSpans || [])[i] || $("better"), lane: $("better-block"),
                      say: bubble(`${e.to} · ${KIND[e.type] || e.type} · ${e.level}`,
                                  [e.meaning, e.native && `(${e.native})`].filter(Boolean).join(" "), e.why),
-                     keys: i ? [words(e.to)] : ["better", words(e.to)] });
+                     keys: i ? [words(e.to)] : ["better", "lepšie", words(e.to)] });
       });
       if (p.card && p.card.improved) {
         steps.push({ el: $("better").firstElementChild || $("better"), lane: $("better-block"),
-                     say: bubble("Now you say it:", p.card.improved), keys: ["now you say it", "now say it"] });
+                     say: bubble("Now you say it:", p.card.improved), keys: ["now you say it", "now say it", "teraz to povedz"] });
       }
     } else if (mode === "explain") {
       lessonSteps();

@@ -159,7 +159,7 @@ Return ONLY JSON:
   "tiers": {{
     "A2": [
       {{"text": "run late", "kind": "phrasal | collocation | word | expression",
-        "meaning": "very simple English meaning, max 8 words",
+        "meaning": "very simple {language_name} meaning, max 8 words",
         "native": "{native_language} translation",
         "plain": "the plain A2 way to say it that this item upgrades, or empty",
         "example": "one natural example sentence on this topic, max 12 words"}}
@@ -232,3 +232,187 @@ def build_lexicon(data_dir: Path, topic: dict, language_name: str,
     finally:
         with _lock:
             _building.discard(tid)
+
+
+# ── The first lesson in a topic ──────────────────────────────────────────────
+# A learner cannot answer "What do you do in the morning?" in words they have
+# never been given. So every topic (not free talk) opens with a TAUGHT lesson,
+# like a teacher gives it: the topic's own dictionary words and word partners,
+# the linking words, the grammar of the current unit on this topic, how to make
+# a sentence longer, a short model dialogue said line by line, then sentence
+# frames the learner finishes about their own life. Only after that does the
+# free conversation start. The pack is written once per topic and level.
+
+STARTER_VERSION = 2
+STARTER_COUNTS = {"words": 6, "collocations": 4, "linkers": 4, "dialogue": 6, "frames": 3}
+
+
+def starter_path(data_dir: Path, topic_id: str, level: str) -> Path:
+    return data_dir / "topics" / f"{topic_id}.starter.{level}.json"
+
+
+def load_starter(data_dir: Path, topic_id: str, level: str) -> dict | None:
+    path = starter_path(data_dir, topic_id, level)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        ok = isinstance(data, dict) and data.get("words") and data.get("version") == STARTER_VERSION
+        return data if ok else None
+    except Exception:
+        return None
+
+
+def _starter_audience(level: str) -> str:
+    if level == "A1":
+        return "The learner knows almost nothing yet: the most common, basic items only."
+    return (f"The learner already knows the basic words below {level}: do NOT teach those "
+            f"(no 'coffee', 'milk', 'morning'). Choose items that are NEW and useful at {level}.")
+
+
+def _dictionary_lines(lexicon: dict | None, level: str) -> str:
+    """The topic's fixed dictionary at this level - the lesson teaches from it,
+    so the words in the lesson and the words on the screen are the same."""
+    if not lexicon:
+        return ""
+    tier = level if level in TIERS else ("A2" if level == "A1" else "B2")
+    items = (lexicon.get("tiers") or {}).get(tier) or []
+    if not items:
+        return ""
+    rows = "\n".join(f"  - {i['text']} ({i['kind']}): {i.get('meaning', '')}" for i in items)
+    rule = ("Take the \"words\" and \"collocations\" FROM this list (the simplest ones that "
+            "fit A1; basic words of your own only if too few fit)." if level == "A1" else
+            "Take the \"words\" and \"collocations\" FROM this list - the same text, exactly.")
+    return f"\nTHE TOPIC'S DICTIONARY at {tier}:\n{rows}\n{rule}\n"
+
+
+def _starter_prompt(topic: dict, language_name: str, native_language: str,
+                    level: str, explain_in: str, lexicon: dict | None,
+                    grammar: list[tuple[str, str]]) -> str:
+    subs = ", ".join(topic.get("subtopics") or []) or "the most useful everyday situations"
+    scene = (f"\nThe learner's own scenario for this topic: \"{topic['prompt']}\" - build "
+             "the dialogue exactly around it." if topic.get("prompt") else "")
+    gram = ("; ".join(f"{name} ({hint})" for name, hint in grammar)
+            or f"the most useful grammar point for level {level}")
+    c = STARTER_COUNTS
+    return f"""You are a {language_name} teacher preparing the FIRST lesson of a topic
+for a learner at CEFR level {level}. Topic: "{topic['name']}" (sub-areas: {subs}).{scene}
+The learner's native language is {native_language}. Explanations are given in {explain_in}.
+
+{_starter_audience(level)} Everything is short and useful for speaking about
+this topic right away. Every {language_name} item must be exactly right (spelling,
+diacritics, grammar) and natural for level {level}.
+{_dictionary_lines(lexicon, level)}
+Write:
+- "words": {c['words']} key words or expressions for the topic.
+- "collocations": {c['collocations']} word partners / phrasal verbs people really say.
+- "linkers": {c['linkers']} linking words for joining sentences (like and, but, then, because,
+  so), right for level {level}. Each with a short example sentence ON THIS TOPIC.
+- "grammar": the grammar of this lesson, taught on this topic: {gram}.
+  "name" (short, in {explain_in}), "rule" (ONE very simple sentence in {explain_in}, no grammar
+  jargon), "examples" (3 short {language_name} sentences on this topic that use it).
+- "extend": 2 chains that show how to make a sentence LONGER step by step. Each chain has
+  3 {language_name} sentences, each one the previous plus one new part (when / where / with
+  whom / why / a linking word), and "how": what was added, in {explain_in}, max 5 words.
+- "dialogue": a short real dialogue of {c['dialogue']} lines for this topic, alternating
+  "partner" and "learner". For a place (a shop, a café, a doctor) the partner is the
+  person working there; otherwise a friend. Start with "partner". Lines max 10 words,
+  using the words, linking words and grammar above.
+- "partner_role": who the partner is, in English, 1-3 words (e.g. "barista", "friend").
+- "frames": {c['frames']} sentence frames for the learner to finish about THEIR OWN life,
+  with ___ for the gap, from easy to harder, using the items and grammar above.
+
+Return ONLY JSON:
+{{
+  "words": [{{"text": "...", "meaning": "{explain_in}, max 6 words", "native": "{native_language}",
+             "example": "short {language_name} sentence on the topic, max 9 words"}}],
+  "collocations": [{{"text": "...", "meaning": "...", "native": "...", "example": "..."}}],
+  "linkers": [{{"text": "...", "meaning": "...", "native": "...", "example": "..."}}],
+  "grammar": {{"name": "...", "rule": "...", "examples": ["...", "...", "..."]}},
+  "extend": [{{"steps": [{{"text": "...", "how": ""}}, {{"text": "...", "how": "..."}},
+                         {{"text": "...", "how": "..."}}]}}],
+  "partner_role": "...",
+  "dialogue": [{{"who": "partner | learner", "text": "...", "meaning": "{explain_in} translation"}}],
+  "frames": [{{"frame": "{language_name} sentence with ___", "meaning": "{explain_in} translation",
+              "hint": "what to put in the gap, in {explain_in}, max 5 words",
+              "example": "one full example answer"}}]
+}}"""
+
+
+def _clean(value, limit: int = 140) -> str:
+    return str(value or "").strip()[:limit]
+
+
+def build_starter(data_dir: Path, topic: dict, language_name: str, native_language: str,
+                  level: str, explain_in: str, lexicon: dict | None = None,
+                  grammar: list[tuple[str, str]] | None = None,
+                  grammar_ids: list[str] | None = None) -> dict | None:
+    """Write the topic's first lesson once. Blocking (one model call); None on
+    failure - nothing half-written is saved."""
+    key = f"starter:{topic['id']}:{level}"
+    with _lock:
+        if key in _building:
+            return None
+        _building.add(key)
+    try:
+        existing = load_starter(data_dir, topic["id"], level)
+        if existing:
+            return existing
+        prompt = _starter_prompt(topic, language_name, native_language, level, explain_in,
+                                 lexicon, grammar or [])
+        data: dict = {}
+        for model in (an.LESSON_MODEL, an.ANALYSIS_MODEL):
+            try:
+                data = an.parse_json(an.gemini(prompt, model=model, json_out=True))
+            except Exception as e:
+                print(f"[Topics] starter for {topic['id']} with {model}: {e}")
+                data = {}
+            if data.get("words") and data.get("dialogue"):
+                break
+
+        def items(name: str) -> list[dict]:
+            out = []
+            for it in data.get(name) or []:
+                if isinstance(it, dict) and _clean(it.get("text")):
+                    out.append({k: _clean(it.get(k)) for k in ("text", "meaning", "native", "example")})
+            return out[:STARTER_COUNTS[name] + 1]
+
+        dialogue = []
+        for line in data.get("dialogue") or []:
+            if isinstance(line, dict) and _clean(line.get("text")):
+                who = "learner" if str(line.get("who", "")).lower().startswith("l") else "partner"
+                dialogue.append({"who": who, "text": _clean(line["text"]),
+                                 "meaning": _clean(line.get("meaning"))})
+        frames = [{k: _clean(fr.get(k)) for k in ("frame", "meaning", "hint", "example")}
+                  for fr in data.get("frames") or []
+                  if isinstance(fr, dict) and "___" in str(fr.get("frame") or "")]
+        g = data.get("grammar") if isinstance(data.get("grammar"), dict) else {}
+        grammar_out = {"name": _clean(g.get("name"), 60), "rule": _clean(g.get("rule"), 200),
+                       "examples": [_clean(e) for e in (g.get("examples") or []) if _clean(e)][:3],
+                       "skills": list(grammar_ids or [])}
+        extend = []
+        for chain in data.get("extend") or []:
+            steps = [{"text": _clean(s.get("text")), "how": _clean(s.get("how"), 40)}
+                     for s in (chain or {}).get("steps") or [] if isinstance(s, dict) and _clean(s.get("text"))]
+            if len(steps) >= 2:
+                extend.append(steps[:4])
+        pack = {"version": STARTER_VERSION, "topic": topic["id"], "name": topic["name"],
+                "level": level, "explain_in": explain_in,
+                "partner_role": _clean(data.get("partner_role") or "friend", 30),
+                "words": items("words"), "collocations": items("collocations"),
+                "linkers": items("linkers"),
+                "grammar": grammar_out if grammar_out["rule"] and grammar_out["examples"] else None,
+                "extend": extend[:2], "dialogue": dialogue[:10],
+                "frames": frames[:STARTER_COUNTS["frames"] + 1]}
+        if len(pack["words"]) < 3 or not any(d["who"] == "learner" for d in dialogue):
+            return None
+        path = starter_path(data_dir, topic["id"], level)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
+        return pack
+    except Exception as e:
+        print(f"[Topics] starter for {topic['id']} failed: {e}")
+        return None
+    finally:
+        with _lock:
+            _building.discard(key)

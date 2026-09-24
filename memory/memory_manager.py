@@ -458,7 +458,7 @@ def save_session_summary(summary: str, language: str = "") -> None:
     print(f"[Memory] 📝 Session saved ({entry['date']}): {summary[:60]}…")
 
 
-def pop_last_session() -> dict | None:
+def pop_last_session(language: str = "") -> dict | None:
     """Return the most recent session summary not yet mentioned, and mark it.
 
     This used to delete the entry. That stopped the morning briefing repeating
@@ -476,7 +476,8 @@ def pop_last_session() -> dict | None:
             if not isinstance(sessions, list) or not sessions:
                 return None
             entry = next((c for c in reversed(sessions)
-                          if not c.get("mentioned")), None)
+                          if not c.get("mentioned")
+                          and (not language or c.get("language", "English") == language)), None)
             if entry is None:
                 return None
             entry["mentioned"] = True

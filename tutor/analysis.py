@@ -293,7 +293,8 @@ _STRICTNESS_RULES = {
 
 BOARD_RULES = """- "board": the whiteboard explanation, written for THIS learner and THIS
   mistake - never a generic textbook page. Explain the FIRST correction (or,
-  when "request" is "explain", what they asked about). Very simple English at
+  when "request" is "explain", what they asked about). Every word of it
+  (title, rule, formula, labels, examples) in very simple {explain_in} at
   their level.
   {"title": "what went wrong, max 6 words, e.g. 'share WITH someone'",
    "rule": "one or two short sentences: why THEIR words were wrong and what to do",
@@ -386,7 +387,7 @@ def clean_board(board) -> dict | None:
 
 def make_board(*, language_name: str, level: str, skill_name: str, hint: str = "",
                said: str = "", wrong: str = "", right: str = "", topic: str = "",
-               facts: str = "") -> dict | None:
+               facts: str = "", explain_in: str = "English") -> dict | None:
     """The board for a correction the learner clicked, or a rule they asked
     about - one quick call."""
     if wrong or right:
@@ -400,12 +401,21 @@ def make_board(*, language_name: str, level: str, skill_name: str, hint: str = "
 Topic of the conversation: {topic or "anything"}. What we know about them: {facts or "nothing yet"}.
 
 Return ONLY JSON: {{"board": {{...}}}} with
-{BOARD_RULES}"""
+{BOARD_RULES.replace("{explain_in}", explain_in)}"""
     try:
         return clean_board(parse_json(gemini(prompt, json_out=True)).get("board"))
     except Exception as e:
         print(f"[Analysis] board: {e}")
         return None
+
+
+def _upgrade_hint(language_name: str) -> str:
+    if language_name == "English":
+        return ('FIRST choice a phrasal verb ("work on" -> "get on with", "finish" -> "wrap '
+                'up", "learn" -> "pick up", "understand" -> "figure out"), then a collocation '
+                '("do a project" -> "take on a project"), then a stronger word or a ready expression.')
+    return (f"FIRST choice a fixed phrase or collocation a native {language_name} speaker "
+            "uses, then a more precise verb, then a stronger word or a ready spoken expression.")
 
 
 def _skill_catalogue(skills: dict) -> str:
@@ -426,7 +436,7 @@ def analysis_prompt(text: str, *, language_name: str, native_language: str,
                     skills: dict, strictness: str,
                     live_dictionary: list | None = None,
                     topic_name: str = "", known_words: list | None = None,
-                    scenario: str = "", question: str = "",
+                    scenario: str = "", question: str = "", explain_in: str = "English",
                     from_audio: bool = False) -> str:
     targets = ", ".join(unit_skills) or "none"
     if from_audio:
@@ -482,11 +492,11 @@ Return ONLY a JSON object:
   ],
   "correct_uses": ["skill ids this sentence used CORRECTLY"],
   "corrected": "their whole sentence, fixed, keeping their own words and meaning",
-  "improved": "the CORRECTED sentence made richer at {up} level, or empty - see the rules",
+  "improved": "the CORRECTED sentence said better at {up} level - usually with a phrasal verb or collocation",
   "enrich": [
     {{"from": "the plain words in the corrected sentence", "to": "what replaced them in improved",
       "type": "phrasal | collocation | word | expression",
-      "level": "{up}", "meaning": "very simple English, max 8 words",
+      "level": "{up}", "meaning": "very simple {explain_in}, max 8 words",
       "native": "{native_language} translation of the new item",
       "why": "why it is better, max 12 simple words"}}
   ],
@@ -507,29 +517,26 @@ RULES:
   count for anything advanced. Pay special attention to the lesson targets.
 - "native_words": {native_language} words mixed into the sentence, with the
   {language_name} word they needed. Empty if none.
-- "improved" and "enrich": the corrected sentence said a little better - the
-  way a real teacher would, or nothing. Build "improved" from the CORRECTED
-  sentence: keep its words and change ONLY the parts listed in "enrich".
-  "from" is the plain part of the corrected sentence; "to" replaces it, is
-  always different and appears word for word in "improved". 1 or 2 items.
-  Items one level above {level} ({up}), never two.
+- "improved" and "enrich": the learner wants EVERY sentence lifted one level,
+  so give them almost always. Build "improved" from the CORRECTED sentence:
+  keep its words and change ONLY the parts listed in "enrich". Swap one or two
+  plain parts for what a fluent speaker would say - {_upgrade_hint(language_name)} "from" is
+  the plain part of the corrected sentence; "to" replaces it, is always
+  different and appears word for word in "improved". 1 or 2 items, one level
+  above {level} ({up}), never two. Prefer the topic's word list when one fits.
+  The new item must MEAN the same as what it replaces in this sentence
+  ("learn" is "pick up", never "catch up on"; "work on a project" can be
+  "get on with a project").
 - NEVER change a fact: the person's job, name, place, time, people and what
   happened stay exactly as they said ("programmer" stays "programmer",
-  "yesterday" stays "yesterday"). Upgrade only HOW it is said: a plain verb to
-  a phrasal verb or collocation, "very tired" to "exhausted", "many cars" to
-  "heavy traffic".
-- You MAY add one short detail (a reason, a time, a result) only when it
-  follows logically from what they said AND fits the topic, the scenario and
-  the tutor's question above - e.g. "I cut down on junk food" -> "I'm trying to
-  cut down on junk food to eat a more balanced diet". Never add a reason or an
-  activity they did not suggest ("I want to talk about myself because I am
-  busy today", "... and chill out earlier" are nonsense). Never bring in words
-  from another subject.
-- When no upgrade is natural - a short answer, a name, a greeting, a sentence
-  that is already fine for the situation - give "improved": "" and
-  "enrich": []. No better version is far better than a strange one.
+  "yesterday" stays "yesterday"). Upgrade only HOW it is said.
+- Do not invent new content: no reason, activity or detail they did not say
+  ("... because I am busy today" is nonsense). The sentence may get a little
+  longer only through the upgrade itself.
+- Only for a greeting, a name, a yes / no, or an answer of three words or
+  fewer give "improved": "" and "enrich": [].
 - "misused": only items from the lists above, only when clearly wrong. Usually empty.
-{BOARD_RULES}
+{BOARD_RULES.replace("{explain_in}", explain_in)}
 - "request": "explain" when the learner is asking the TEACHER to explain or
   teach something ("explain present tense", "can you explain the past
   simple?", "what is a phrasal verb?"); "skip" when they ask to skip or move
@@ -571,11 +578,31 @@ def analyse_audio(pcm16k: bytes, **ctx) -> tuple[str, dict]:
     return text, _finish(data, text, ctx["skills"])
 
 
-def transcribe(pcm16k: bytes) -> str:
-    """Only the words - for a repeat, where there is nothing new to analyse."""
-    return gemini("Write down exactly what this learner of English says, word for word, "
-                  "keeping any grammar mistakes. Return only the words.",
-                  audio_wav=pcm_to_wav(pcm16k)).strip().strip('"')
+def transcribe(pcm16k: bytes, language_name: str = "English", expected: str = "",
+               vocabulary: list[str] | None = None, native_language: str = "") -> str:
+    """Only the words - for a repeat, where there is nothing new to analyse.
+
+    A beginner's accent is hard to hear, so the transcriber is told what they
+    were just asked to say and which words the lesson uses - as a hint for
+    spelling, never as a replacement for what was really said. A language
+    other than English goes to the stronger model: the light one hears
+    beginner Slovak badly."""
+    hints = []
+    if expected:
+        hints.append(f'They were just asked to say: "{expected}".')
+    if vocabulary:
+        hints.append("Words from their lesson: " + ", ".join(vocabulary[:40]) + ".")
+    prompt = (
+        f"Transcribe this audio. The speaker is a beginner learner of {language_name}"
+        + (f" (native language {native_language})" if native_language else "")
+        + ", with an accent and slow, careful speech. " + " ".join(hints)
+        + f" Write exactly what they really said, word for word. Spell {language_name} words "
+        f"correctly, with all diacritics. Keep their grammar mistakes and missing words - "
+        "if they said something different from what they were asked, write what they said, "
+        "not the expected sentence. If they speak another language, write that as said. "
+        "Return only the words.")
+    model = ANALYSIS_MODEL if language_name == "English" else LESSON_MODEL
+    return gemini(prompt, model=model, audio_wav=pcm_to_wav(pcm16k)).strip().strip('"')
 
 
 def analyse(text: str, **ctx) -> dict:

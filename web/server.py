@@ -157,7 +157,8 @@ class App:
     async def data(self, request: web.Request) -> web.Response:
         """The account and dictionary pages ask for their data when opened."""
         getter = {"account": "account_for_ui",
-                  "dictionary": "dictionary_for_ui"}.get(request.match_info["page"])
+                  "dictionary": "dictionary_for_ui",
+                  "intensive": "intensive_for_ui"}.get(request.match_info["page"])
         fn = plugin_fn(getter) if getter else None
         if fn is None:
             return web.json_response({"error": "not available"}, status=404)
@@ -180,6 +181,7 @@ class App:
             return web.json_response({"ok": False, "error": "origin"}, status=403)
         body = await _json_body(request)
         old_voice, old_names = get_voice(), (get_assistant_name(), get_user_name())
+        old_mode = str(get_plugin_config("language_tutor").get("mode") or "English")
         for namespace, values in (body.get("plugins") or {}).items():
             if isinstance(values, dict):
                 before = get_plugin_config(namespace)
@@ -191,7 +193,14 @@ class App:
                  str(body.get("user_name") if body.get("user_name") is not None else old_names[1]))
         if names != old_names:
             await asyncio.to_thread(save_assistant_config, *names)
+        new_mode = str(get_plugin_config("language_tutor").get("mode") or "English")
         if self.live:
+            running = self._session_task is not None and not self._session_task.done()
+            if new_mode != old_mode and running:
+                # Another language: a new lesson from the start, with a clean
+                # board, in that language's course.
+                self.live.restart()
+                return web.json_response({"ok": True})
             # Voice, names, pace and strictness live in the session's system
             # prompt; a new voice also needs a fresh start (resuming would keep
             # the old one).
@@ -301,6 +310,16 @@ class App:
                                report=True, then=self._fresh_topic)
         elif kind == "skip":
             self._plugin_async("skip_step", ui, report=True)
+        elif kind == "track":
+            # Normal lessons or the intensive course: a new conversation in it.
+            self._plugin_async("set_track", str(data.get("value") or "normal"), ui,
+                               report=True, then=self._fresh_track)
+        elif kind == "intensive_lesson":
+            try:
+                index = int(data.get("index", 0))
+            except (TypeError, ValueError):
+                index = 0
+            self._plugin_async("goto_lesson", index, ui, report=True, then=self._fresh_track)
 
     def _fresh_topic(self, ok: bool, message: str) -> None:
         """A new topic (or a new scenario for this one, or the current topic
@@ -309,6 +328,14 @@ class App:
             return
         if message.startswith("Deleted") and "Back to free talk" not in message:
             return                          # another topic was deleted: nothing changes here
+        running = self._session_task is not None and not self._session_task.done()
+        if running:
+            self.live.restart(new_topic=True)
+
+    def _fresh_track(self, ok: bool, message: str) -> None:
+        """Another section or another course lesson: start it from a clean board."""
+        if not ok or message.startswith("Already") or not self.live:
+            return
         running = self._session_task is not None and not self._session_task.done()
         if running:
             self.live.restart(new_topic=True)
