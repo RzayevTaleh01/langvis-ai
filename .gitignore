@@ -29,6 +29,7 @@ env/
 ENV/
 
 # ── Editors and operating systems ─────────────────────────────────────────────
+.claude/
 .vscode/
 .idea/
 *.swp
