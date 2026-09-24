@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LangVis</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23137a63'/%3E%3Cstop offset='1' stop-color='%2364b348'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M16 3C19 3 29 11 29 16S19 29 16 29 3 21 3 16 13 3 16 3Z' fill='url(%23g)'/%3E%3Crect x='10' y='11' width='4' height='6' rx='1.5' fill='%23fffdf9'/%3E%3Crect x='18' y='11' width='4' height='6' rx='1.5' fill='%23fffdf9'/%3E%3C/svg%3E">
+  <!-- Bootstrap is loaded into a low-priority CSS layer by app.css; its JS runs the dropdowns. -->
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body data-page="lesson">
+  <header class="bar">
+    <a class="brand" href="#/lesson"><span class="mark">L</span><span>LangVis</span></a>
+    <div class="chip" id="chip-level" title="Your measured level">-</div>
+    <button class="chip wide chip-btn" id="chip-unit" type="button" title="The whole grammar syllabus and how well you know each rule">Grammar</button>
+    <div class="spacer"></div>
+    <div class="dropdown topic-drop">
+      <button class="topic-pick dropdown-toggle" id="topic-btn" type="button" data-bs-toggle="dropdown"
+              aria-expanded="false" title="What we talk about">
+        <svg class="topic-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span id="topic-name">Topic</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end topic-menu" id="topic-menu" aria-labelledby="topic-btn"></ul>
+    </div>
+    <nav class="nav">
+      <a href="#/lesson" data-page="lesson">Lesson</a>
+      <a href="#/dictionary" data-page="dictionary">Dictionary</a>
+      <a href="#/account" data-page="account">Hesab</a>
+    </nav>
+    <button class="icon-btn" id="settings-btn" type="button" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.6h3.4l.5 2.6c.6.2 1.2.5 1.7.9l2.5-.9 1.7 2.9-2 1.8c.1.6.1 1.3 0 1.9l2 1.8-1.7 2.9-2.5-.9c-.5.4-1.1.7-1.7.9l-.5 2.6h-3.4l-.5-2.6c-.6-.2-1.2-.5-1.7-.9l-2.5.9-1.7-2.9 2-1.8a6 6 0 0 1 0-1.9l-2-1.8 1.7-2.9 2.5.9c.5-.4 1.1-.7 1.7-.9z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    </button>
+  </header>
+
+  <!-- ── Lesson ──────────────────────────────────────────────────────────── -->
+  <main class="page stage" id="page-lesson">
+    <section class="board" id="board" aria-label="Board">
+      <div class="board-top">
+      <div class="board-head">
+        <span class="mode-pill" id="mode-pill" data-mode="idle">
+          <span class="mode-dot"></span><span class="mode-text">Conversation</span>
+        </span>
+        <span class="spacer"></span>
+        <span class="state-pill" id="tutor-state">Offline</span>
+        <button class="icon-btn small" id="restart" type="button" title="Start the lesson again" aria-label="Start the lesson again">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="speech empty" aria-live="polite">
+        <span class="speech-who">LangVis says</span>
+        <p class="speech-text" id="speech-text">Connecting - I will start talking in a moment.</p>
+      </div>
+      </div>
+      <div class="waiting hidden" id="waiting">
+        <div><span class="waiting-label">Your turn - say:</span> <span id="waiting-text"></span></div>
+        <button class="btn ghost small" id="skip" type="button" title="Go on without repeating">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l9 7-9 7zM17 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+          Skip</button>
+      </div>
+
+      <div class="answers hidden" id="answers-block">
+        <div class="label">You can say <span class="answers-q" id="answers-q"></span></div>
+        <ul class="answers-list" id="answers-list"></ul>
+      </div>
+
+      <div class="block" id="said-block">
+        <div class="label">You said <button class="link" id="undo" type="button" hidden>I didn't say that</button></div>
+        <p class="sentence" id="said"><span class="hint">Speak - your sentence is written here.</span></p>
+      </div>
+
+      <div class="block hidden" id="fixed-block">
+        <div class="label">Corrected - say it</div>
+        <p class="sentence fixed" id="fixed"></p>
+        <ol class="fixes" id="fixes"></ol>
+      </div>
+
+      <div class="block lesson hidden" id="lesson-block">
+        <div class="lesson-head">
+          <span class="label">On the board</span>
+          <span class="badge lesson-kind" id="lesson-kind">grammar</span>
+          <span class="badge lvl" id="lesson-band"></span>
+        </div>
+        <div class="lesson-diagram" id="lesson-diagram"></div>
+        <h2 class="lesson-title chalk" id="lesson-title"></h2>
+        <p class="lesson-rule chalk" id="lesson-rule"></p>
+        <ul class="lesson-formula" id="lesson-formula"></ul>
+        <div class="label lesson-use" id="lesson-use">Use it like this</div>
+        <ul class="lesson-examples" id="lesson-examples"></ul>
+      </div>
+
+      <div class="block hidden" id="better-block">
+        <div class="label">Say it better · one level up</div>
+        <p class="sentence better" id="better"></p>
+        <ul class="enrich" id="enrich"></ul>
+      </div>
+
+      <div class="block hidden" id="skills-block">
+        <div class="label">Your grammar</div>
+        <div class="skill-moves" id="skill-moves"></div>
+      </div>
+
+      <p class="notice hidden" id="notice"></p>
+
+      <div class="tutor" id="tutor">
+        <div class="bubble hidden"></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="words" role="tab">Topic words</button>
+        <button class="tab" data-tab="transcript" role="tab">Transcript</button>
+      </div>
+      <div class="pane" id="pane-words">
+        <div class="pane-head" id="words-head">Preparing the topic's words…</div>
+        <ul class="words" id="words"></ul>
+        <div class="label small hidden" id="due-label">Old words - use them again</div>
+        <ul class="words due" id="due"></ul>
+      </div>
+      <div class="pane hidden" id="pane-transcript">
+        <ol class="transcript" id="transcript"></ol>
+      </div>
+    </aside>
+
+    <footer class="controls">
+      <div class="voicebar" id="voicebar">
+        <button class="mic-toggle" id="mic" type="button" aria-pressed="true"
+                title="Microphone on - click to turn it off (F4)" aria-label="Microphone">
+          <svg class="mic-on" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg class="mic-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10.5V6a3 3 0 0 0-5.6-1.5M9 9v2a3 3 0 0 0 4.7 2.5M5.5 11a6.5 6.5 0 0 0 10.4 5.2M18.5 11c0 .8-.1 1.5-.4 2.2M12 17.5V21M4 4l16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <canvas id="wave" aria-hidden="true"></canvas>
+        <span class="voice-hint" id="voice-hint">Just talk - I'm listening</span>
+      </div>
+      <form class="compose hidden" id="compose">
+        <input id="text" type="text" autocomplete="off" placeholder="Type a sentence and press Enter…" aria-label="Type a sentence">
+        <button class="send" type="submit" title="Send" aria-label="Send">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z" fill="currentColor"/></svg>
+        </button>
+      </form>
+      <div class="control-buttons">
+      <button class="icon-btn keyboard" id="keyboard-btn" type="button" title="Type a message instead" aria-label="Type a message">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M6 13.5h.01M18 13.5h.01M9 14h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn ghost" id="interrupt" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+        Interrupt</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ── Dictionary ──────────────────────────────────────────────────────── -->
+  <main class="page doc hidden" id="page-dictionary">
+    <div class="doc-head">
+      <h1>Dictionary</h1>
+      <p class="sub" id="dict-sub"></p>
+    </div>
+    <div class="stats" id="dict-stats"></div>
+    <div class="filters">
+      <input class="input" id="dict-search" type="search" placeholder="Search…" aria-label="Search the dictionary">
+      <select class="select form-select" id="dict-topic" aria-label="Topic"><option value="">All topics</option></select>
+      <select class="select form-select" id="dict-kind" aria-label="Kind">
+        <option value="">All kinds</option><option value="phrasal">Phrasal verbs</option>
+        <option value="collocation">Collocations</option><option value="word">Words</option>
+        <option value="expression">Expressions</option>
+      </select>
+      <select class="select form-select" id="dict-status" aria-label="Status">
+        <option value="">Any status</option><option value="mine">Words I use</option>
+        <option value="suggested">Suggested to learn</option><option value="used">Used at least once</option>
+        <option value="new">New</option><option value="learning">Learning</option>
+        <option value="learned">Learned</option><option value="strong">Strong</option>
+        <option value="due">Due for review</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table class="table" id="dict-table">
+        <thead><tr>
+          <th>Item</th><th>Kind</th><th>Level</th><th>From</th><th>Topic</th>
+          <th class="num">Used</th><th class="num">Days</th><th class="num">Heard</th><th>Last used</th><th>Status</th><th>Back on</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- ── Account ─────────────────────────────────────────────────────────── -->
+  <main class="page doc hidden" id="page-account">
+    <div class="doc-head">
+      <h1>Hesab</h1>
+      <p class="sub" id="acc-sub"></p>
+    </div>
+    <div class="stats" id="acc-stats"></div>
+
+    <div class="grid2">
+      <section class="card">
+        <h2>Level over time</h2>
+        <p class="card-sub">Your measured level at the end of each day, 0-100. The lines are where A2, B1 and B2 start.</p>
+        <div class="chart" id="chart-level"></div>
+      </section>
+      <section class="card">
+        <h2>Dictionary growth</h2>
+        <p class="card-sub">Items learned (used on 3 different days), in total.</p>
+        <div class="chart" id="chart-growth"></div>
+      </section>
+      <section class="card">
+        <h2>Mistakes per day</h2>
+        <p class="card-sub">Corrections made on each practice day.</p>
+        <div class="chart" id="chart-mistakes"></div>
+      </section>
+      <section class="card">
+        <h2>Where the mistakes are</h2>
+        <p class="card-sub">All corrections so far, by grammar.</p>
+        <div class="hbars" id="chart-skills"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Grammar syllabus</h2>
+      <p class="card-sub">Every grammar rule from A1 to B2 and how well you know it - measured from what you say. Click one to see your own mistakes and the rule.</p>
+      <div class="syllabus" id="acc-grammar"></div>
+    </section>
+
+
+    <section class="card">
+      <h2>All my mistakes</h2>
+      <div class="filters">
+        <select class="select form-select" id="mis-skill" aria-label="Grammar"><option value="">All grammar</option></select>
+      </div>
+      <div class="table-wrap">
+        <table class="table" id="mis-table">
+          <thead><tr><th>Date</th><th>I said</th><th>Correct</th><th>Grammar</th><th>Why</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div class="chart-tip hidden" id="tooltip" role="status"></div>
+
+  <div class="overlay hidden" id="key-overlay">
+    <form class="dialog" id="key-form">
+      <h1>Gemini API key</h1>
+      <p>Paste your free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It is saved on this computer only.</p>
+      <input id="key" class="input" type="password" autocomplete="off" placeholder="AIza…" aria-label="Gemini API key">
+      <button class="btn primary" type="submit">Save key</button>
+      <p class="note" id="key-note"></p>
+    </form>
+  </div>
+
+  <div class="overlay hidden" id="custom-overlay">
+    <form class="dialog wide" id="custom-form">
+      <h1 id="custom-title">Your own topic</h1>
+      <p id="custom-sub">Anything you want to talk about - football, programming, a coffee shop. Its words are prepared once.</p>
+      <label class="field">
+        <span>Topic</span>
+        <input id="custom-topic" class="input" type="text" maxlength="40" autocomplete="off" placeholder="e.g. In the coffee shop" aria-label="Topic name">
+      </label>
+      <label class="field">
+        <span>How should the tutor talk with you? (optional)</span>
+        <textarea id="custom-prompt" class="input" rows="6" maxlength="2000"
+                  placeholder="e.g. Be a barista in a busy coffee shop. I am the customer ordering a drink. Ask about size, milk and snacks."></textarea>
+      </label>
+      <div class="actions">
+        <button class="btn" type="button" id="custom-cancel">Cancel</button>
+        <button class="btn primary" type="submit" id="custom-submit">Start topic</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="overlay hidden" id="units-overlay">
+    <div class="dialog wide">
+      <div class="dialog-head">
+        <h1>Grammar syllabus</h1>
+        <button class="icon-btn" type="button" data-close="units-overlay" aria-label="Close">✕</button>
+      </div>
+      <p class="card-sub">Every grammar rule from A1 to B2. There is no order: whatever you use is measured from your own speech. Click a rule to see it explained on the board.</p>
+      <div class="units-list" id="units-list"></div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="settings-overlay">
+    <form class="dialog wide" id="settings-form">
+      <div class="dialog-head">
+        <h1>Settings</h1>
+        <button class="icon-btn" type="button" data-close="settings-overlay" aria-label="Close">✕</button>
+      </div>
+      <div class="settings-grid" id="settings-fields"></div>
+      <div class="settings-memory">
+        <div class="memory-head">
+          <h2>Gemini API keys</h2>
+          <span class="muted" id="keys-count"></span>
+        </div>
+        <p class="muted small-text">The main key runs the lesson. When a key reaches its free daily limit,
+          LangVis moves to another model, then to your extra keys. Keys are saved on this computer only -
+          get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</p>
+        <ul class="memory-list" id="keys-list"></ul>
+        <div class="key-add">
+          <input class="input" id="key-new" type="password" autocomplete="off" placeholder="Paste a Gemini API key…" aria-label="New Gemini API key">
+          <button class="btn" type="button" id="key-add-extra">Add as extra</button>
+          <button class="btn" type="button" id="key-add-main">Set as main</button>
+        </div>
+        <p class="note" id="keys-note"></p>
+      </div>
+      <div class="settings-memory">
+        <div class="memory-head">
+          <h2>What LangVis remembers about you</h2>
+          <span class="muted" id="memory-count"></span>
+        </div>
+        <input class="input" id="memory-search" type="search" placeholder="Search memory…" aria-label="Search memory">
+        <ul class="memory-list" id="memory-list"></ul>
+      </div>
+      <div class="actions end">
+        <button class="btn" type="button" data-close="settings-overlay">Cancel</button>
+        <button class="btn primary" type="submit">Save</button>
+      </div>
+      <p class="muted">Saving restarts the connection so the tutor uses the new settings. A new voice starts a fresh lesson.</p>
+    </form>
+  </div>
+
+  <div class="overlay hidden" id="content-overlay">
+    <div class="dialog wide">
+      <h1 id="content-title"></h1>
+      <pre class="content" id="content-text"></pre>
+      <button class="btn" id="content-close">Close</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

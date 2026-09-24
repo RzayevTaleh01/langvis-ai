@@ -19,6 +19,7 @@ import json
 import re
 import sys
 import threading
+import time
 from pathlib import Path
 
 ANALYSIS_MODEL = "gemini-flash-lite-latest"   # per utterance: frequent, cheap
@@ -85,7 +86,7 @@ def looks_english(text: str) -> bool:
 # ── Did they actually use it? ────────────────────────────────────────────────
 # The checklist must tick when the LEARNER says the word, not when the tutor
 # does, and it has to survive inflection: "commuting" is "commute", "gave up"
-# is "give up", "picked me up" is "pick up". Matching is local and instant —
+# is "give up", "picked me up" is "pick up". Matching is local and instant -
 # asking a model whether a word appeared would cost a round trip per sentence
 # and still argue about "gave" versus "give".
 
@@ -151,20 +152,99 @@ def used_items(text: str, items: list[str]) -> list[str]:
 
 # ── Talking to the model ─────────────────────────────────────────────────────
 
-_client = None
+# Every model has its own free daily limit. When one is used up (429), or busy
+# (503), or gone (404), the next one of the same kind answers instead - and if
+# every model of a key is spent, the next key. A spent model rests: a daily
+# limit is checked again after an hour, a per-minute one after its delay.
+FAST_MODELS = ("gemini-flash-lite-latest", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview",
+               "gemini-3.6-flash", "gemini-3-flash-preview")
+SMART_MODELS = ("gemini-flash-latest", "gemini-3.6-flash", "gemini-3-flash-preview",
+                "gemini-3.1-flash-lite", "gemini-flash-lite-latest")
+CALL_TIMEOUT_MS = 30000           # a model that hangs is left for the next one
+
+_clients: dict[str, object] = {}
 _client_lock = threading.Lock()
+_resting: dict[tuple[str, str], float] = {}     # (key tail, model) -> monotonic time it may be tried again
+_last_used: dict[str, str] = {}                 # first model of a chain -> the one that answered
 
 
-def gemini(prompt: str, model: str = ANALYSIS_MODEL) -> str:
-    global _client
+def _keys() -> list[str]:
+    try:
+        data = json.loads(API_CONFIG.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    keys = [data.get("gemini_api_key") or ""] + list(data.get("gemini_extra_keys") or [])
+    return [k for k in dict.fromkeys(str(k).strip() for k in keys) if len(k) > 15]
+
+
+def _client_for(key: str):
     with _client_lock:
-        if _client is None:
+        if key not in _clients:
             from google import genai
-            key = json.loads(API_CONFIG.read_text(encoding="utf-8"))["gemini_api_key"]
-            _client = genai.Client(api_key=key)
-        client = _client
-    resp = client.models.generate_content(model=model, contents=prompt)
-    return (getattr(resp, "text", "") or "").strip()
+            _clients[key] = genai.Client(api_key=key, http_options={"timeout": CALL_TIMEOUT_MS})
+        return _clients[key]
+
+
+def _chain(model: str) -> list[str]:
+    for family in (FAST_MODELS, SMART_MODELS):
+        if model in family:
+            return [model] + [m for m in family if m != model]
+    return [model]
+
+
+def _rest_for(err: str) -> float | None:
+    """How long a model rests after this error, or None if it is not the
+    model's fault (a bad prompt) and must be raised."""
+    if "429" in err or "RESOURCE_EXHAUSTED" in err:
+        if "PerDay" in err:
+            return 3600.0
+        m = re.search(r"retry in ([\d.]+)s", err)
+        return float(m.group(1)) + 1 if m else 60.0
+    if "404" in err or "NOT_FOUND" in err:
+        return 24 * 3600.0
+    if any(k in err for k in ("503", "UNAVAILABLE", "500", "INTERNAL", "timed out", "Timeout", "DEADLINE")):
+        return 60.0
+    return None
+
+
+def gemini(prompt: str, model: str = ANALYSIS_MODEL, audio_wav: bytes | None = None,
+           json_out: bool = False) -> str:
+    contents: object = prompt
+    if audio_wav:
+        from google.genai import types
+        contents = [types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"), prompt]
+    config = {"response_mime_type": "application/json"} if json_out else None
+    last: Exception | None = None
+    keys = _keys()
+    if not keys:
+        raise RuntimeError("No Gemini API key - add one in Settings.")
+    for n, key in enumerate(keys):
+        tail = key[-6:]
+        for m in _chain(model):
+            if time.monotonic() < _resting.get((tail, m), 0.0):
+                continue
+            try:
+                resp = _client_for(key).models.generate_content(model=m, contents=contents, config=config)
+            except Exception as e:
+                err = str(e)
+                if "API key not valid" in err or "API_KEY_INVALID" in err or "PERMISSION_DENIED" in err:
+                    last = e
+                    break                       # this key is no good: the next key
+                rest = _rest_for(err)
+                if rest is None:
+                    raise
+                _resting[(tail, m)] = time.monotonic() + rest
+                print(f"[Analysis] {m}{' (key ' + str(n + 1) + ')' if n else ''} not available "
+                      f"({err[:40]}) - trying the next model")
+                last = e
+                continue
+            used = f"{m}{' · key ' + str(n + 1) if n else ''}"
+            if _last_used.get(model) != used:
+                if model in _last_used or used != model:
+                    print(f"[Analysis] now using {used}")
+                _last_used[model] = used
+            return (getattr(resp, "text", "") or "").strip()
+    raise last or RuntimeError("Every Gemini model is resting - try again later.")
 
 
 def parse_json(raw: str) -> dict:
@@ -205,27 +285,179 @@ _STRICTNESS_RULES = {
 }
 
 
+# ── The board: an explanation written for THIS mistake ──────────────────────
+# The analyser (and make_board, for a click or an "explain" request) writes the
+# whiteboard itself - the rule as it applies to what the learner said, their
+# own sentence as the example, and the picture that shows it best. The fixed
+# cards in curriculum.py are only the fallback when the model gives nothing.
+
+BOARD_RULES = """- "board": the whiteboard explanation, written for THIS learner and THIS
+  mistake - never a generic textbook page. Explain the FIRST correction (or,
+  when "request" is "explain", what they asked about). Very simple English at
+  their level.
+  {"title": "what went wrong, max 6 words, e.g. 'share WITH someone'",
+   "rule": "one or two short sentences: why THEIR words were wrong and what to do",
+   "formula": ["1 or 2 short patterns, max 45 characters each"],
+   "diagram": ONE picture that makes THIS point clear - choose the kind that fits:
+     {"kind": "fix", "wrong": ["their", "sentence", "in", "chunks"], "right": ["the", "fixed", "chunks"],
+      "bad": [index of the wrong chunk in "wrong"], "good": [index of the fixed chunk in "right"]}
+        - their own sentence as blocks, max 7 chunks; best for word choice,
+          prepositions, articles, word order and missing words
+     {"kind": "timeline", "items": [{"type": "point | range | repeat | cross",
+        "at": -1..1, "from": -1..1, "to": -1..1, "label": "max 22 characters"}]}
+        - for tenses: WHEN it happens (-1 past, 0 now, 1 future), max 3 items
+     {"kind": "split", "left": {"title": "max 18 chars", "lines": ["max 3 lines, 24 chars"]},
+      "right": {"title": "...", "lines": ["..."]}}
+        - two forms side by side (their wrong use vs the right one, or two rules)
+     {"kind": "flow", "items": ["chunk", "→", "chunk", "→", "chunk"]}
+        - how the sentence is built, step by step, max 6 items
+     {"kind": "ladder", "items": ["big", "bigger", "the biggest"]} - forms that grow
+   "examples": ["2 short example sentences about the learner's own life or the topic"]}
+  Give {} when there is no correction and no explain request."""
+
+_DIAGRAM_KINDS = ("fix", "timeline", "split", "flow", "ladder", "blocks", "nest", "shift")
+
+
+def _short(value, limit: int) -> str:
+    return " ".join(str(value or "").split())[:limit]
+
+
+def _clean_diagram(d) -> dict | None:
+    """Only a picture the board can draw: known kind, short labels, sane numbers."""
+    if not isinstance(d, dict) or d.get("kind") not in _DIAGRAM_KINDS:
+        return None
+    kind = d["kind"]
+    num = lambda v: max(-0.9, min(0.9, float(v)))     # the ends of the line stay on the board
+    try:
+        if kind == "fix":
+            wrong = [_short(x, 24) for x in (d.get("wrong") or []) if _short(x, 24)][:8]
+            right = [_short(x, 24) for x in (d.get("right") or []) if _short(x, 24)][:8]
+            bad = [int(i) for i in (d.get("bad") or []) if 0 <= int(i) < len(wrong)]
+            good = [int(i) for i in (d.get("good") or []) if 0 <= int(i) < len(right)]
+            if not wrong or not right:
+                return None
+            return {"kind": kind, "wrong": wrong, "right": right, "bad": bad, "good": good}
+        if kind == "timeline":
+            items = []
+            for it in (d.get("items") or [])[:4]:
+                if not isinstance(it, dict) or it.get("type") not in ("point", "range", "repeat", "cross", "arrow"):
+                    continue
+                row = {"type": it["type"], "label": _short(it.get("label"), 24)}
+                if it["type"] in ("point", "cross"):
+                    row["at"] = num(it.get("at", 0))
+                else:
+                    row["from"], row["to"] = sorted((num(it.get("from", -0.5)), num(it.get("to", 0))))
+                items.append(row)
+            return {"kind": kind, "items": items} if items else None
+        if kind == "split":
+            cols = []
+            for side in ("left", "right"):
+                c = d.get(side) if isinstance(d.get(side), dict) else {}
+                cols.append({"title": _short(c.get("title"), 20),
+                             "lines": [_short(x, 28) for x in (c.get("lines") or []) if _short(x, 28)][:3]})
+            if not (cols[0]["lines"] or cols[1]["lines"]):
+                return None
+            return {"kind": kind, "left": cols[0], "right": cols[1]}
+        if kind in ("flow", "ladder", "blocks"):
+            items = [_short(x, 22) for x in (d.get("items") or []) if _short(x, 22)][:7]
+            return {"kind": kind, "items": items} if len(items) >= 2 else None
+        if kind in ("nest", "shift"):
+            items = [[_short(a, 22), _short(b, 26)] for a, b in
+                     (x for x in (d.get("items") or []) if isinstance(x, (list, tuple)) and len(x) == 2)][:4]
+            return {"kind": kind, "items": items} if items else None
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def clean_board(board) -> dict | None:
+    """The model's board, checked - or None, and the fixed card is used."""
+    if not isinstance(board, dict):
+        return None
+    rule = _short(board.get("rule"), 220)
+    title = _short(board.get("title"), 60)
+    if not rule or not title:
+        return None
+    return {"title": title, "rule": rule,
+            "formula": [_short(f, 60) for f in (board.get("formula") or []) if _short(f, 60)][:2],
+            "diagram": _clean_diagram(board.get("diagram")),
+            "examples": [_short(e, 110) for e in (board.get("examples") or []) if _short(e, 110)][:2]}
+
+
+def make_board(*, language_name: str, level: str, skill_name: str, hint: str = "",
+               said: str = "", wrong: str = "", right: str = "", topic: str = "",
+               facts: str = "") -> dict | None:
+    """The board for a correction the learner clicked, or a rule they asked
+    about - one quick call."""
+    if wrong or right:
+        what = (f'The learner said: "{said}". The mistake: "{wrong}" -> "{right}" '
+                f"({skill_name}: {hint}). Explain THIS mistake.")
+    else:
+        what = (f'The learner asked about the rule "{skill_name}" ({hint}). Explain it for them'
+                + (f' - their last sentence was "{said}".' if said else "."))
+    prompt = f"""You are a {language_name} teacher at a whiteboard, teaching a {level} learner.
+{what}
+Topic of the conversation: {topic or "anything"}. What we know about them: {facts or "nothing yet"}.
+
+Return ONLY JSON: {{"board": {{...}}}} with
+{BOARD_RULES}"""
+    try:
+        return clean_board(parse_json(gemini(prompt, json_out=True)).get("board"))
+    except Exception as e:
+        print(f"[Analysis] board: {e}")
+        return None
+
+
 def _skill_catalogue(skills: dict) -> str:
-    return "\n".join(f"  {sid}: {name} ({band})"
-                     for sid, (name, band, _hint) in skills.items())
+    # The hint says what a skill is FOR - "prepositions" alone would take
+    # every preposition mistake, "share for you" included.
+    return "\n".join(f"  {sid}: {name} ({band}) - {hint}"
+                     for sid, (name, band, hint) in skills.items())
+
+
+def _next_band(level: str) -> str:
+    order = ("A1", "A2", "B1", "B2", "C1", "C2")
+    i = order.index(level) if level in order else 1
+    return order[min(i + 1, len(order) - 1)]
 
 
 def analysis_prompt(text: str, *, language_name: str, native_language: str,
                     level: str, unit_title: str, unit_skills: list[str],
                     skills: dict, strictness: str,
-                    live_dictionary: list | None = None) -> str:
+                    live_dictionary: list | None = None,
+                    topic_name: str = "", known_words: list | None = None,
+                    scenario: str = "", question: str = "",
+                    from_audio: bool = False) -> str:
     targets = ", ".join(unit_skills) or "none"
+    if from_audio:
+        utterance = (
+            "THE UTTERANCE is the attached audio of the learner speaking.\n"
+            "FIRST write it down in \"transcript\" EXACTLY as spoken - every word, "
+            "every grammar mistake kept as it was said (\"I go yesterday\" stays \"I go "
+            "yesterday\"), nothing added, nothing corrected - with normal capital letters "
+            "and punctuation. Then analyse THAT transcript.")
+        transcript_field = '\n  "transcript": "exactly what they said, mistakes kept",'
+    else:
+        utterance = f'THE UTTERANCE (automatic speech-to-text transcript):\n"""{text}"""'
+        transcript_field = ""
+    up = _next_band(level)
     lexis = ""
     if live_dictionary:
-        lexis = ("\nWords and phrasal verbs already waiting in their dictionary "
-                 "(do not suggest these again): "
-                 + ", ".join(live_dictionary) + "\n")
+        lexis += ("\nTHE TOPIC'S WORD LIST (prefer these in \"improved\" when one fits): "
+                  + ", ".join(live_dictionary) + "\n")
+    if known_words:
+        lexis += ("Items the learner has ALREADY learned (reuse one in \"improved\" "
+                  "only when it fits THIS topic and THIS sentence): " + ", ".join(known_words[:30]) + "\n")
+    topic_line = f'The conversation topic is "{topic_name}".\n' if topic_name else ""
+    if scenario:
+        topic_line += f'The learner\'s scenario for this topic: """{scenario[:1200]}"""\n'
+    if question:
+        topic_line += f'The tutor has just said / asked: "{question[-300:]}"\n'
     return f"""You are a {language_name} teacher analysing ONE sentence spoken aloud by
 a learner. Their native language is {native_language}. Their level is about {level}.
-The lesson right now is "{unit_title}", practising: {targets}.{lexis}
+{topic_line}The grammar being learned now is "{unit_title}", practising: {targets}.{lexis}
 
-THE UTTERANCE (automatic speech-to-text transcript):
-\"\"\"{text}\"\"\"
+{utterance}
 
 HOW TO READ IT:
 - It is a transcript. Ignore punctuation, capitalisation, "um", repeated words
@@ -233,12 +465,15 @@ HOW TO READ IT:
 - Judge grammar, word choice, word order and naturalness.
 - {_STRICTNESS_RULES.get(strictness, _STRICTNESS_RULES['normal'])}
 - Never invent a mistake. Correct language gets an empty corrections list.
+- A sentence that is correct in a normal situation is NOT a mistake: never
+  change its tense, its words or its style just because you would say it
+  differently ("I grab a bite" is correct - do not turn it into "I'm grabbing").
 
 SKILL IDS (use ONLY these ids in "skill" and "correct_uses"):
 {_skill_catalogue(skills)}
 
 Return ONLY a JSON object:
-{{
+{{{transcript_field}
   "is_target_language": true,
   "score": 0-100,
   "corrections": [
@@ -247,14 +482,20 @@ Return ONLY a JSON object:
   ],
   "correct_uses": ["skill ids this sentence used CORRECTLY"],
   "corrected": "their whole sentence, fixed, keeping their own words and meaning",
-  "improved": "the same meaning said one level better, using a target word or phrasal verb where it fits naturally",
-  "improved_uses": ["the target words or phrasal verbs your improved version used"],
+  "improved": "the CORRECTED sentence made richer at {up} level, or empty - see the rules",
+  "enrich": [
+    {{"from": "the plain words in the corrected sentence", "to": "what replaced them in improved",
+      "type": "phrasal | collocation | word | expression",
+      "level": "{up}", "meaning": "very simple English, max 8 words",
+      "native": "{native_language} translation of the new item",
+      "why": "why it is better, max 12 simple words"}}
+  ],
+  "misused": ["items from the word lists above that the learner used with a WRONG meaning or in a wrong way"],
+  "board": {{"title": "...", "rule": "...", "formula": ["..."], "diagram": {{"kind": "..."}}, "examples": ["..."]}},
+  "request": {{"kind": "none | explain | skip | ask", "about": "the grammar point or word they want explained, in English"}},
+  "vocab": ["every content word, phrasal verb and fixed chunk the learner USED in this sentence, in its base form, spelled correctly: 'went' -> 'go', 'cutting down on' -> 'cut down on'"],
   "praise": "if the sentence was already correct: three words on what was good, otherwise empty",
-  "topic": "two or three words for what they are talking about",
-  "suggest_words": ["3 to 5 {language_name} words a speaker would use on THIS topic, one step above {level}, that they did not use"],
-  "suggest_phrasals": ["1 to 3 natural phrasal verbs for THIS topic at their level"],
-  "native_words": [{{"native": "word in {native_language}", "target": "{language_name} word"}}],
-  "upgrades": [{{"simple": "plain word they used", "better": "stronger word one level up"}}]
+  "native_words": [{{"native": "word in {native_language}", "target": "{language_name} word"}}]
 }}
 
 RULES:
@@ -266,20 +507,83 @@ RULES:
   count for anything advanced. Pay special attention to the lesson targets.
 - "native_words": {native_language} words mixed into the sentence, with the
   {language_name} word they needed. Empty if none.
-- "upgrades": at most 1, empty when the wording is fine.
-- "suggest_words" / "suggest_phrasals": build the learner's vocabulary out of
-  their OWN subject. If they are talking about their job, suggest work words; if
-  about football, football words. Never grammar terms, never words they just
-  used, never anything two levels above them. Single words or short fixed
-  phrases ("run late", "make up my mind").
+- "improved" and "enrich": the corrected sentence said a little better - the
+  way a real teacher would, or nothing. Build "improved" from the CORRECTED
+  sentence: keep its words and change ONLY the parts listed in "enrich".
+  "from" is the plain part of the corrected sentence; "to" replaces it, is
+  always different and appears word for word in "improved". 1 or 2 items.
+  Items one level above {level} ({up}), never two.
+- NEVER change a fact: the person's job, name, place, time, people and what
+  happened stay exactly as they said ("programmer" stays "programmer",
+  "yesterday" stays "yesterday"). Upgrade only HOW it is said: a plain verb to
+  a phrasal verb or collocation, "very tired" to "exhausted", "many cars" to
+  "heavy traffic".
+- You MAY add one short detail (a reason, a time, a result) only when it
+  follows logically from what they said AND fits the topic, the scenario and
+  the tutor's question above - e.g. "I cut down on junk food" -> "I'm trying to
+  cut down on junk food to eat a more balanced diet". Never add a reason or an
+  activity they did not suggest ("I want to talk about myself because I am
+  busy today", "... and chill out earlier" are nonsense). Never bring in words
+  from another subject.
+- When no upgrade is natural - a short answer, a name, a greeting, a sentence
+  that is already fine for the situation - give "improved": "" and
+  "enrich": []. No better version is far better than a strange one.
+- "misused": only items from the lists above, only when clearly wrong. Usually empty.
+{BOARD_RULES}
+- "request": "explain" when the learner is asking the TEACHER to explain or
+  teach something ("explain present tense", "can you explain the past
+  simple?", "what is a phrasal verb?"); "skip" when they ask to skip or move
+  on; "ask" when they talk TO the tutor instead of practising: they ask why it
+  corrected them or showed something ("why do you show me in on at?"), say it
+  is wrong, ask a real question that needs a real answer, or tell it how to
+  work ("speak slower", "don't correct small things", "let's just chat");
+  otherwise "none". A request is still checked for mistakes.
+- "skill": pick the skill whose description fits the mistake itself. A
+  preposition that belongs to a verb or adjective ("share with", "listen to",
+  "good at") is dependent_prepositions, not prepositions (in / on / at for
+  time and place).
 - "is_target_language": false if the sentence is not mainly {language_name}.
 """
 
 
+def pcm_to_wav(pcm16k: bytes) -> bytes:
+    import io
+    import wave
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(pcm16k)
+    return buf.getvalue()
+
+
+def analyse_audio(pcm16k: bytes, **ctx) -> tuple[str, dict]:
+    """Hear the learner's own voice, write down exactly what they said - their
+    mistakes kept, which live speech-to-text tends to smooth over - and analyse
+    it, in ONE call. Returns (transcript, analysis); the analysis is {} when the
+    speech was not in the target language or was unusable."""
+    raw = gemini(analysis_prompt("", from_audio=True, **ctx), audio_wav=pcm_to_wav(pcm16k))
+    data = parse_json(raw)
+    text = str(data.get("transcript") or "").strip()
+    if not text:
+        return "", {}
+    return text, _finish(data, text, ctx["skills"])
+
+
+def transcribe(pcm16k: bytes) -> str:
+    """Only the words - for a repeat, where there is nothing new to analyse."""
+    return gemini("Write down exactly what this learner of English says, word for word, "
+                  "keeping any grammar mistakes. Return only the words.",
+                  audio_wav=pcm_to_wav(pcm16k)).strip().strip('"')
+
+
 def analyse(text: str, **ctx) -> dict:
     """Analyse one target-language utterance. {} when unusable."""
-    skills = ctx["skills"]
-    data = parse_json(gemini(analysis_prompt(text, **ctx)))
+    return _finish(parse_json(gemini(analysis_prompt(text, **ctx))), text, ctx["skills"])
+
+
+def _finish(data: dict, text: str, skills: dict) -> dict:
     if not data or not data.get("is_target_language", True):
         return {}
     try:
@@ -304,20 +608,44 @@ def analyse(text: str, **ctx) -> dict:
                             if s in skills and s not in wrong_skills][:5]
     data["native_words"] = [w for w in (data.get("native_words") or [])
                             if isinstance(w, dict) and w.get("target")][:5]
-    data["upgrades"] = [u for u in (data.get("upgrades") or [])
-                        if isinstance(u, dict) and u.get("better")][:1]
     for key in ("corrected", "improved", "praise"):
         data[key] = str(data.get(key) or "").strip()
-    data["improved_uses"] = [str(x) for x in (data.get("improved_uses") or [])][:3]
-    data["topic"] = str(data.get("topic") or "").strip()[:40]
-    data["suggest_words"] = [str(x).strip().lower()
-                             for x in (data.get("suggest_words") or [])
-                             if str(x).strip()][:5]
-    data["suggest_phrasals"] = [str(x).strip().lower()
-                                for x in (data.get("suggest_phrasals") or [])
-                                if str(x).strip()][:3]
     if not data["corrected"]:
         data["corrected"] = text.strip()
+
+    enrich = []
+    improved_low = data["improved"].lower()
+    for e in data.get("enrich") or []:
+        if not isinstance(e, dict):
+            continue
+        to = str(e.get("to") or "").strip()
+        if not to or to.lower() not in improved_low:
+            continue            # it must be findable on the board
+        if to.lower() == str(e.get("from") or "").strip().lower():
+            continue            # "find out instead of find out" teaches nothing
+        kind = str(e.get("type") or "word").strip().lower()
+        enrich.append({
+            "from": str(e.get("from") or "").strip()[:60], "to": to[:60],
+            "type": kind if kind in ("phrasal", "collocation", "word", "expression") else "word",
+            "level": str(e.get("level") or "").strip().upper()[:2],
+            "meaning": str(e.get("meaning") or "").strip()[:80],
+            "native": str(e.get("native") or "").strip()[:60],
+            "why": str(e.get("why") or "").strip()[:100],
+        })
+    data["enrich"] = enrich[:3]
+    if not data["enrich"]:
+        # A "better" version with nothing new in it to explain teaches nothing.
+        data["improved"] = ""
+    data["improved_uses"] = [e["to"] for e in data["enrich"]]
+    data["board"] = clean_board(data.get("board"))
+    data["misused"] = [str(x).strip().lower() for x in (data.get("misused") or [])
+                       if str(x).strip()][:5]
+    data["vocab"] = [str(x).strip().lower() for x in (data.get("vocab") or [])
+                     if str(x).strip()][:20]
+    req = data.get("request") if isinstance(data.get("request"), dict) else {}
+    kind = str(req.get("kind") or "none").strip().lower()
+    data["request"] = {"kind": kind if kind in ("explain", "skip", "ask") else "none",
+                       "about": str(req.get("about") or "").strip()[:60]}
     return data
 
 
@@ -388,7 +716,7 @@ def drill(*, language_name: str, native_language: str, level: str,
     """
     examples = ("Mistakes this learner really made:\n" + "\n".join(mistakes[:5])
                 if mistakes else "No stored mistakes for this skill yet.")
-    method = (f"\nRUN IT AS THIS TECHNIQUE — the prompts must fit it:\n{technique}\n"
+    method = (f"\nRUN IT AS THIS TECHNIQUE - the prompts must fit it:\n{technique}\n"
               if technique else "")
     prompt = f"""Write a short SPOKEN {language_name} drill for a {level} learner
 (native language: {native_language}) on "{skill_name}" ({hint}).

@@ -1,8 +1,9 @@
 # LangVis
 
-**A speaking language course for the desktop.**
-You talk, LangVis listens, corrects every sentence, remembers your mistakes
-and takes you from **A2 to B2**.
+**A speaking language course in your browser.**
+You pick a topic and talk. LangVis thinks about every sentence before it
+answers, corrects it, makes it one level richer, has you say both versions,
+and takes you from **A2 to B2** inside every topic.
 
 > LangVis is not a chatbot or an assistant. It does not open apps, control
 > your computer or search the web. It has one job: to make you speak better.
@@ -10,10 +11,10 @@ and takes you from **A2 to B2**.
 | | |
 |---|---|
 | **Languages** | English (active) · Slovak (planned) |
-| **Course** | 6 stages × 4 units = 24 grammar units, A2.1 → B2.2 |
+| **Course** | 6 stages × 4 units = 24 grammar units, A2.1 → B2.2, climbed in every topic |
+| **Topics** | 13 ready topics + your own, each with a fixed A2 / B1 / B2 word list |
 | **Voice** | real-time two-way audio through the Gemini Live API |
-| **Level** | measured from your own speech, never guessed |
-| **Platform** | Python + PyQt6 · Windows, macOS, Linux |
+| **Platform** | Python server + any modern browser · Windows, macOS, Linux |
 
 ---
 
@@ -21,13 +22,15 @@ and takes you from **A2 to B2**.
 
 - [Quick start](#quick-start)
 - [The screen](#the-screen)
-- [A lesson](#a-lesson)
+- [One sentence, step by step](#one-sentence-step-by-step)
+- [Topics](#topics)
+- [The dictionary](#the-dictionary)
+- [Hesab - your account](#hesab---your-account)
 - [The course](#the-course)
-- [Teaching methods](#teaching-methods)
 - [What it tracks](#what-it-tracks)
 - [Project structure](#project-structure)
 - [Extending LangVis](#extending-langvis)
-- [Privacy](#privacy)
+- [Limits and privacy](#limits-and-privacy)
 
 ---
 
@@ -35,73 +38,129 @@ and takes you from **A2 to B2**.
 
 ```bash
 python setup.py   # installs the dependencies
-python main.py    # starts LangVis
+python main.py    # starts LangVis and opens http://localhost:8765
 ```
 
-1. Paste a free [Gemini API key](https://aistudio.google.com/apikey) into the
-   setup screen.
-2. Open **⚙ → Tutor settings** and set your level, your own language, the pace
-   and how strictly to correct.
-3. Start talking. The lesson begins by itself.
+1. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
+   page asks for it.
+2. Open **⚙ Settings**: your level, your own language, the pace, how strictly
+   to correct, the tutor's voice.
+3. Pick a **topic** in the header, press **Start lesson**, allow the
+   microphone, and talk.
 
-**Optional:** **⚙ → Wake word** downloads a small local model, so the
-microphone is only streamed after you say the wake phrase.
+`python main.py --no-open` starts the server without opening a browser tab.
 
 ---
 
 ## The screen
 
 ```
-┌ LangVis  [English ▾]        A2 · 48/100 → B2   14 today   Transcript  ⚙ ┐
-├─────────────┬───────────────────────────────────────────────────────────┤
-│ SYLLABUS    │  NOW TEACHING · UNIT 2 OF 24   Right now      ▓▓▓░ 41%    │
-│ A2.1 …      │  present continuous · method: form contrast → substitution│
-│  1 ✓ Me…    │                    ( the voice mark )                     │
-│  2 ▶ Right… │                   Your turn — speak                       │
-│  3 · Last…  │  YOU SAID     I am cook dinner and do the laundry now     │
-│ A2.2 …      │  CORRECTED    I am cooking dinner and doing the laundry.  │
-│  5 · Plans  │  TIP          am/is/are + verb-ing                        │
-│             │  SAY IT BETTER  I am cooking while I tidy up the kitchen. │
-│             │  WORDS TO USE  ✓cook  laundry 1/2  noisy  [tidy up] …     │
-│             │  [type a sentence] [▸]  [Interrupt]  [Microphone on · F4] │
-├─────────────┴───────────────────────────────────────────────────────────┤
-│ WE ARE FIXING  word order 12/100 · prepositions 14/100                  │
-└─────────────────────────────────────────────────────────────────────────┘
+┌ LangVis  A2 · 31/100 → B2  [A2.1 · Unit 3/24 Past simple · 90%]   (💬 Work ▾)  Lesson  Dictionary  Hesab  ⚙ ┐
+├──────────────────────────────────────────────────────────────┬──────────────────────┤
+│ WORK · A2.1 · UNIT 3/24                        Your turn    │ TOPIC WORDS │ TRANSCRIPT│
+│ YOU SAID    Yesterday I go① to office②                       │ B1 · 3/12 learned     │
+│ CORRECTED   Yesterday I went to the office.                  │ run late   phrasal ●●○○│
+│    (tutor)  ① past simple - yesterday = past                 │ deal with  phrasal ●○○○│
+│ SAY IT BETTER   I headed to the office early yesterday.      │ heavy traffic colloc. │
+│             head to · phrasal verb · B1 - go to · getmək     │ OLD WORDS - USE AGAIN │
+│ YOUR GRAMMAR    ▼ past simple 72 → 65                        │ make a decision       │
+│ ▌LANGVIS  Did you mean: Yesterday I went to the office? Say it.                      │
+├──────────────────────────────────────────────────────────────┴──────────────────────┤
+│ ( Type a sentence and press Enter…                ➤ )  Fluency · 2 min  Interrupt  🎤 │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Area | What it shows |
 |---|---|
-| **Syllabus** (left) | All stages and units in order. Click a unit to see its forms, rules, examples and methods. |
-| **Coaching** (centre) | Your sentence as you say it, then the marked version: mistakes in red, the correction in green with the reason, a short **tip** and a **say it better** upgrade. |
-| **Dictionary** (right) | Words and phrasal verbs taken from *your* topic, one step above your level. A word is learned after you use it twice yourself. |
-| **Tutor face** | Drawn at runtime. The mouth follows the real audio level; the rim colour shows the state — green listening, terracotta speaking, mustard thinking, rose mic off. |
-| **Transcript** | Closed by default. Open it from the header to read the conversation back. |
+| **Header** | Your level, where this topic is in the course (click it for all 24 units and your progress), the topic select, the pages, ⚙ settings. |
+| **Board** | Your sentence as the analyser heard it - mistakes kept, never smoothed over - then the corrected sentence, the richer version with each new item explained and translated, and which grammar went up or down. |
+| **The tutor** | The LangVis face, drawn at runtime. It walks across the board and stands under the word it is explaining, with a speech bubble. Click anything on the board and it goes there and explains it. Rim colour: green listening, mustard thinking, terracotta speaking, rose mic off. |
+| **Subtitles** | What the tutor is saying, at the bottom of the board. |
+| **Topic words** | The topic's fixed list, one level above you, with how often and on how many different days you used each item. |
+| **Transcript** | The conversation, to read back. |
 
 ---
 
-## A lesson
+## One sentence, step by step
 
-Every session follows the same five steps:
+LangVis **thinks before it answers**. A live voice model normally replies the
+instant you stop talking - before anything has checked what you said. Here the
+server decides when your turn ends, holds the tutor's reply, and while the face
+shows it is thinking your own voice is transcribed (mistakes kept) and
+analysed. Only then does the tutor speak, told exactly what to say.
 
-1. **Warm-up** — a greeting and one easy question.
-2. **Review** — drills built from your own recent mistakes.
-3. **Current unit** — the target grammar, guided questions, then a speaking task.
-4. **Conversation** — free talk on the unit's theme, with corrections.
-5. **Wrap-up** — one thing you did well, one thing to practise, the new words.
+```
+you speak ──▶ thinking (1-3 s) ──▶ mistake?  "Did you mean: …? Say it."        ──▶ you repeat ✓
+                                                                                       │
+                                   correct?  "Better: … Now you say it."  ◀─────────────┘
+                                                                         ──▶ you repeat ✓
+                                   "Good." + an answer + the next question, built so that
+                                   the answer needs one of your topic words or old words
+```
 
-**Every sentence gets two checks:**
+- **A repeat is checked by the system**, not by the model: it must match the
+  sentence and contain the part that matters - the corrected words, or the new
+  phrase. "Almost - missing *running late*" is shown on the board.
+- A repeat is asked for at most twice, then the lesson moves on.
+- **"Better"** always lifts the sentence one level: a phrasal verb, a
+  collocation, a stronger word - never a different meaning.
+- **I didn't say that** takes the last sentence back if it was misheard.
+- **Fluency · 2 min** - you talk without being stopped; the feedback comes at
+  the end.
+- Typed sentences go through exactly the same steps.
 
-- **Is it right?** If not, the tutor gives the correct version, asks you to
-  repeat it, and only then answers you.
-- **Can it be better?** Even a correct sentence gets one upgrade — a stronger
-  word, a phrasal verb, a longer structure.
+---
 
-A correct sentence gets no comment — the tutor just answers. You can turn
-correction-first off in **⚙ → Tutor settings**.
+## Topics
 
-When the same mistake happens three times, the tutor runs a short drill on it.
-When a unit or stage is finished, the next one starts without restarting the
-session.
+Pick one in the header: Daily life, Work, Home, Food, Shopping and money,
+Travel, Health, Free time, Family and friends, Technology, City and transport,
+Education, Opinions and society - or **your own** (football, programming…).
+
+- **Every topic climbs the whole course, A2 → B2.** The topic stays the same;
+  the questions grow up with the grammar: describing at A2, experiences and
+  stories at B1, opinions and "what would have happened if…" at B2.
+- Grammar belongs to you, not to a topic: a unit whose skills are already
+  strong passes after a short check in a new topic, so later topics climb
+  faster and focus on words.
+- Each topic's word list is **written once**, the first time you open it, in
+  three tiers (A2 / B1 / B2) of phrasal verbs, collocations, stronger words and
+  ready expressions - then it never changes. You always see the tier one level
+  above you; when most of it is learned the next tier opens.
+
+---
+
+## The dictionary
+
+Every item you meet - the topic lists and every upgrade the board showed you -
+is kept for good.
+
+| Status | Means | Comes back |
+|---|---|---|
+| new | not used yet | in its topic, until you use it |
+| learning | used on 1-2 different days | after 1, then 3 days |
+| learned | used on 3+ different days | after 7 or 14 days |
+| strong | used on 5+ different days | every 30 days, forever |
+
+Two uses in one conversation prove nothing, so the ladder counts **different
+days**. A wrong use drops the item a step and brings it back the same day. Due
+items come back in **whatever topic you are in** - the tutor builds a question
+that needs them (at most five per lesson).
+
+The **Dictionary** page lists everything: uses, wrong uses, days, last use,
+next review, and your own sentences with each item. Filter by topic, kind or
+status.
+
+---
+
+## Hesab - your account
+
+- **Level over time**, **dictionary growth**, **mistakes per day** and **where
+  the mistakes are** (by grammar) - as charts with hover values.
+- **Grammar syllabus** - all ~36 skills by level with mastery, right and wrong
+  uses; click one for the rule and your own mistakes.
+- **Course** in the current topic, and how far **every topic** has come.
+- **All my mistakes** - every correction ever made, filterable by grammar.
 
 ---
 
@@ -116,89 +175,69 @@ session.
 | **B2.1** | Precision in the past | Past perfect · Third conditional & wishes · Reported speech · Modals of deduction |
 | **B2.2** | Range and control | Advanced passive · Future continuous & perfect · Discourse markers · Collocation & natural choice |
 
-Focus by level: **accuracy** at A2, **fluency** at B1, **precision** at B2.
-
-A unit is passed when you have spoken enough in it and its target forms are
-strong. A stage is passed when your measured level reaches the stage goal.
-
----
-
-## Teaching methods
-
-Each unit names the methods it is practised with, and the tutor receives the
-steps of each method with the lesson.
-
-| Method | Purpose |
-|---|---|
-| Present, practise, produce | learn a new form and start using it |
-| Substitution / transformation drills | make a form automatic |
-| Form contrast | stop two forms mixing ("I work" / "I am working") |
-| Dictogloss | hear grammar in real speech, then rebuild the text |
-| Retelling | turn what you heard into what you can say |
-| 4/3/2 fluency | tell one story in 2 min, 90 s, 60 s |
-| Information gap | you must ask questions to find out |
-| Role play | practise real situations |
-| Pushed output | use the target form five times before moving on |
-| Chunk push | learn three collocations and use them within two minutes |
-| Shadowing | copy the tutor's rhythm |
-| Backchaining | build a long sentence from the end |
-| Native-language contrast | fix mistakes that come from your own language |
-| Clarification request | notice and repair your own mistake |
-| Recast and repeat | correct without stopping the conversation |
-| Personalisation | examples rebuilt from your own life |
-| Spaced review | revisit what you are about to forget |
-| Can-do check | finish a unit by doing the task alone, once |
+A unit passes when you have spoken enough in it and its target grammar is
+strong. A stage passes when your measured level reaches the stage goal. The
+grammar is taught through conversation about your topic, not through drills -
+a short drill runs only when the same mistake keeps coming back, or when you
+ask for one.
 
 ---
 
 ## What it tracks
 
-Every sentence is analysed in the background by a small, fast model, so the
-live conversation never waits.
-
 | Tracked | Meaning |
 |---|---|
 | **Level** | rolling CEFR score over your recent sentences |
-| **Skills** | ~40 grammar skills, each with mastery, real mistakes and a review date |
-| **Focus** | the three weakest skills at your stage — what the tutor works on next |
-| **Course** | current unit and stage, and how close each is to passing |
-| **Dictionary** | offered words and how often you used them |
-| **Missing words** | things you said in your own language, kept until you say them in the target language |
-| **Fallbacks** | how often you switched to your own language |
+| **Skills** | ~36 grammar skills, each with mastery, real mistakes and a review date |
+| **Mistakes** | every correction: what you said, the fix, the grammar, the topic |
+| **Course** | the unit and stage of every topic |
+| **Dictionary** | every item: uses, days, your sentences, next review |
+| **Missing words** | things you said in your own language, until you say them in English |
 
 Progress is saved per language, for example in `english/`:
 
-- `level.json` — the raw numbers (source of truth)
-- `progress.md` — a readable summary, regenerated from `level.json`
+- `level.json` - the raw numbers (source of truth)
+- `progress.md` - a readable summary, regenerated from `level.json`
+- `topics/*.json` - each topic's fixed word list
 
 ---
 
 ## Project structure
 
 ```
-main.py                     Gemini Live session: audio in/out, tools, reconnects
-ui.py                       interface: syllabus, tutor face, coaching, settings
+main.py                     starts the server and opens the browser
 setup.py                    installs dependencies
 requirements.txt
 
+web/
+  server.py                 aiohttp server: page, WebSocket, JSON for the pages
+  bridge.py                 WebUI - the session's messages to every open tab
+  static/                   the page: board, tutor, dictionary, account (no build step)
+    app.js                  socket, header, pages, settings
+    board.js                the board and the tutor's walk across it
+    tutor.js                the LangVis face (SVG) and its movement
+    pages.js                dictionary and account pages, charts
+    audio.js                microphone out, voice in
+    mic-worklet.js          microphone → 16 kHz PCM
+
 core/
+  live.py                   the Gemini Live session: turns, thinking, voice, tools
   prompt.txt                the tutor's core instructions
   plugin_loader.py          finds plugins: tools, observers, prompt blocks
-  audio_devices.py          microphone and speaker selection
-  wake_word.py              optional offline wake word
   selflog.py                keeps a log of LangVis's own output and errors
 
 tutor/
   curriculum.py             skills, rules, stages, units, methods
-  progress.py               learner state: level, skills, course, vocabulary
-  analysis.py               per-sentence analysis and drill generation
+  topics.py                 topics, question depth, the fixed word lists
+  progress.py               learner state: level, skills, course, dictionary, account
+  analysis.py               per-sentence analysis (from text or from your voice)
 
 plugins/
-  language_tutor.py         the tutor: observe → measure → teach
+  language_tutor.py         the tutor: think → correct → enrich → record
   _template.py              starting point for a new plugin
 
 memory/                     settings and what LangVis remembers about you
-config/                     app icon and local API key
+config/                     your local API key
 ```
 
 ---
@@ -214,9 +253,9 @@ tool the tutor can call. Start from `plugins/_template.py`. Optional hooks:
 |---|---|
 | `observe(text, player)` | see every sentence |
 | `format_for_prompt()` | add standing instructions to every session |
-| `PLUGIN_SETTINGS` | show a settings form |
-| `status_for_ui()` / `syllabus_for_ui()` | appear in the interface |
-| `set_language(name)` | react to the language select |
+| `PLUGIN_SETTINGS` | fields in the ⚙ settings form |
+| `status_for_ui()` / `syllabus_for_ui()` / `coaching_for_ui()` | appear in the page |
+| `gate_audio()` / `gate_text()` | decide the tutor's reply before it speaks |
 
 ### Adding a language (e.g. Slovak)
 
@@ -224,21 +263,21 @@ tool the tutor can call. Start from `plugins/_template.py`. Optional hooks:
 2. Add a word-level detector for it in `tutor/analysis.py`.
 3. Set `LANGUAGES["slovak"]["enabled"] = True`.
 
-The interface already lists Slovak — nothing else needs to change.
-
 ---
 
-## Privacy
+## Limits and privacy
 
-Your API key, settings, memory and all progress files (`english/`, `slovak/`)
-stay on your computer and are git-ignored. Audio is sent only to the Gemini
-API during a session.
-
-No images are shipped: the tutor's face, icons and progress bars are drawn at
-runtime, so the interface stays sharp at any screen scale.
+- A **free Gemini key** has daily limits. The per-sentence analysis uses the
+  fast model, which has the larger allowance; when a limit is reached the tutor
+  keeps talking and the board says why it is quiet.
+- The server listens on `127.0.0.1` only, and only its own page may connect to
+  it.
+- Your API key, settings, memory and all progress files (`english/`,
+  `slovak/`) stay on your computer and are git-ignored. Audio is sent only to
+  the Gemini API during a lesson.
 
 ---
 
 ## Author
 
-**Taleh Rzayev** — design, code and curriculum.
+**Taleh Rzayev** - design, code and curriculum.

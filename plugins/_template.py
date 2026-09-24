@@ -2,7 +2,7 @@
 Drop-in LangVis plugin template.
 
 Copy this file, rename it (no leading underscore), fill in PLUGIN and run().
-No other file needs to change — LangVis discovers this automatically at startup.
+No other file needs to change - LangVis discovers this automatically at startup.
 """
 
 PLUGIN = {
@@ -11,7 +11,7 @@ PLUGIN = {
         "One or two sentences Gemini uses to decide when to call this tool. "
         "Be explicit about trigger phrases and, if it could be confused with "
         "another tool, say which tool NOT to use instead (see game_updater's "
-        "description in main.py for the pattern)."
+        "description in core/live.py for the pattern)."
     ),
     "parameters": {
         "type": "OBJECT",
@@ -25,10 +25,10 @@ PLUGIN = {
 def run(parameters: dict, player=None, session_memory=None) -> str:
     """
     parameters: dict of the args Gemini extracted, matching PLUGIN['parameters'].
-    player: the LangVisUI instance — use player.write_log(f"LangVis: ...") to log,
+    player: the page (web/bridge.WebUI) - use player.write_log(f"LangVis: ...") to log,
             same as actions/*.py. May be None.
     session_memory: reserved, usually None today (core tools mostly pass None too).
-    Return a short natural-language string — this is spoken back to the user.
+    Return a short natural-language string - this is spoken back to the user.
     Never raise: catch your own errors and return a spoken error string instead
     (the loader also catches exceptions as a second safety net, but don't rely on it).
     """

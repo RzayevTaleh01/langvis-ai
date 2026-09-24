@@ -73,7 +73,7 @@ ENGLISH_SKILLS: dict[str, tuple[str, str, str]] = {
                                "a = one of many, the = the one we know"),
     "plurals_quantity":       ("plurals and quantity", "A2",
                                "some/any, much/many, a lot of, countable nouns"),
-    "prepositions":           ("prepositions", "A2",
+    "prepositions":           ("prepositions of time and place (in / on / at)", "A2",
                                "in/on/at for time and place, to/from"),
     "pronouns_possessives":   ("pronouns and possessives", "A2",
                                "I/me/my/mine, Taleh's car"),
@@ -460,6 +460,137 @@ SKILL_TIPS: dict[str, tuple[str, list[str]]] = {
 }
 
 
+# ── On the board ─────────────────────────────────────────────────────────────
+# What the tutor draws when it explains a skill: the form as a formula, and a
+# picture of what it means. The pictures are specs, drawn by the page
+# (web/static/diagrams.js):
+#   timeline  PAST - NOW - FUTURE with points, ranges, repeats and arrows (x: -1..1)
+#   flow      boxes joined by arrows ("if + past" → "would + verb")
+#   ladder    steps rising left to right (big → bigger → the biggest)
+#   nest      rings from big to small (in → on → at)
+#   split     two columns side by side, for two forms that get mixed up
+#   blocks    the slots of a sentence, in order
+#   shift     pairs that change, e.g. reported speech backshift
+
+SKILL_BOARD: dict[str, dict] = {
+    "present_simple": {"formula": ["I / you / we / they + verb", "he / she / it + verb-s",
+                                   "don't / doesn't + verb"],
+                       "diagram": {"kind": "timeline", "items": [
+                           {"type": "repeat", "from": -0.9, "to": 0.9, "n": 7, "label": "every day"}]}},
+    "present_continuous": {"formula": ["am / is / are + verb-ing"],
+                           "diagram": {"kind": "timeline", "items": [
+                               {"type": "range", "from": -0.18, "to": 0.18, "label": "right now"}]}},
+    "past_simple": {"formula": ["verb-ed / irregular (went, saw)", "didn't + verb",
+                                "Did + subject + verb?"],
+                    "diagram": {"kind": "timeline", "items": [
+                        {"type": "point", "at": -0.55, "label": "yesterday - finished"}]}},
+    "future_forms": {"formula": ["am / is / are going to + verb  (a plan)",
+                                 "will + verb  (decided now)"],
+                     "diagram": {"kind": "timeline", "items": [
+                         {"type": "arrow", "from": 0, "to": 0.6, "label": "going to"},
+                         {"type": "point", "at": 0.6, "label": "tomorrow"}]}},
+    "questions": {"formula": ["(Wh-) + do / does / did + subject + verb?"],
+                  "diagram": {"kind": "blocks", "items": ["Where", "do", "you", "live", "?"]}},
+    "word_order": {"formula": ["subject + verb + object + place + time"],
+                   "diagram": {"kind": "blocks", "items": ["I", "met", "my friend", "in the park",
+                                                           "yesterday"]}},
+    "subject_verb_agreement": {"formula": ["he / she / it works · they work", "a person is · people are"],
+                               "diagram": {"kind": "split", "left": {"title": "one", "lines": ["she works", "it is", "a person is"]},
+                                           "right": {"title": "many", "lines": ["they work", "we are", "people are"]}}},
+    "articles": {"formula": ["a / an = one of many, new", "the = the one we both know"],
+                 "diagram": {"kind": "split", "left": {"title": "a / an - new", "lines": ["I saw a dog.", "an apple"]},
+                             "right": {"title": "the - known", "lines": ["The dog was big.", "the sun"]}}},
+    "plurals_quantity": {"formula": ["many + countable (many books)", "much + uncountable (much water)",
+                                     "a lot of + both"],
+                         "diagram": {"kind": "split", "left": {"title": "countable", "lines": ["many books", "a few friends"]},
+                                     "right": {"title": "uncountable", "lines": ["much water", "a little time"]}}},
+    "prepositions": {"formula": ["in - big (years, months, cities)", "on - days, surfaces",
+                                 "at - exact (times, points)"],
+                     "diagram": {"kind": "nest", "items": [["in", "2026 · May · Baku"], ["on", "Monday · 5 May"],
+                                                           ["at", "5 o'clock · the door"]]}},
+    "pronouns_possessives": {"formula": ["I → me → my → mine", "Taleh's car"],
+                             "diagram": {"kind": "blocks", "items": ["I", "me", "my", "mine"]}},
+    "comparatives": {"formula": ["short: big → bigger → the biggest",
+                                 "long: expensive → more expensive → the most expensive"],
+                     "diagram": {"kind": "ladder", "items": ["big", "bigger", "the biggest"]}},
+    "modals_basic": {"formula": ["can / must / should + verb  (no 'to')"],
+                     "diagram": {"kind": "blocks", "items": ["You", "should", "rest", "(no to!)"]}},
+    "linking_words": {"formula": ["and (add) · but (contrast) · because (reason) · so (result)"],
+                      "diagram": {"kind": "flow", "items": ["I was tired", "so", "I went to bed"]}},
+    "word_choice": {"formula": ["the word that carries the meaning", "make / do · say / tell · watch / look / see"],
+                    "diagram": {"kind": "split", "left": {"title": "make", "lines": ["a decision", "a mistake"]},
+                                "right": {"title": "do", "lines": ["homework", "the shopping"]}}},
+    "present_perfect": {"formula": ["have / has + V3 (been, done, seen)"],
+                        "diagram": {"kind": "timeline", "items": [
+                            {"type": "arrow", "from": -0.7, "to": 0, "label": "from then until now"}]}},
+    "perfect_vs_past": {"formula": ["yesterday / in 2020 → past simple", "ever / already / yet / since → present perfect"],
+                        "diagram": {"kind": "split", "left": {"title": "past simple", "lines": ["I saw it yesterday.", "finished time"]},
+                                    "right": {"title": "present perfect", "lines": ["I have seen it.", "no time - result now"]}}},
+    "past_continuous": {"formula": ["was / were + verb-ing", "…when + past simple"],
+                        "diagram": {"kind": "timeline", "items": [
+                            {"type": "range", "from": -0.85, "to": -0.3, "label": "I was walking"},
+                            {"type": "point", "at": -0.55, "label": "it started to rain"}]}},
+    "used_to": {"formula": ["used to + verb  (not any more)"],
+                "diagram": {"kind": "timeline", "items": [
+                    {"type": "repeat", "from": -0.9, "to": -0.25, "n": 5, "label": "I used to play"},
+                    {"type": "cross", "at": 0, "label": "not now"}]}},
+    "first_conditional": {"formula": ["If + present, will + verb"],
+                          "diagram": {"kind": "flow", "items": ["If it rains", "→", "I will stay home"]}},
+    "modals_possibility": {"formula": ["might / could + verb  (maybe)", "have to + verb  (necessary)"],
+                           "diagram": {"kind": "ladder", "items": ["might", "could", "will", "must"]}},
+    "second_conditional": {"formula": ["If + past simple, would + verb  (imagined, now)"],
+                           "diagram": {"kind": "flow", "items": ["If I had money", "→", "I would travel"]}},
+    "gerund_infinitive": {"formula": ["enjoy / finish / stop + verb-ing", "want / decide / hope + to + verb"],
+                          "diagram": {"kind": "split", "left": {"title": "+ -ing", "lines": ["I enjoy cooking.", "stop smoking"]},
+                                      "right": {"title": "+ to", "lines": ["I want to cook.", "decide to go"]}}},
+    "phrasal_verbs": {"formula": ["verb + particle = new meaning", "look for · find out · give up"],
+                      "diagram": {"kind": "blocks", "items": ["give", "+", "up", "=", "stop trying"]}},
+    "relative_clauses": {"formula": ["who (people) · which / that (things) · where (places)"],
+                         "diagram": {"kind": "blocks", "items": ["the man", "who", "lives next door"]}},
+    "passive_simple": {"formula": ["be + V3 (+ by …)", "It is made in… · It was built in…"],
+                       "diagram": {"kind": "flow", "items": ["They built it", "→", "It was built"]}},
+    "word_forms": {"formula": ["noun · adjective · adverb", "happiness · happy · happily"],
+                   "diagram": {"kind": "blocks", "items": ["happiness (n)", "happy (adj)", "happily (adv)"]}},
+    "past_perfect": {"formula": ["had + V3 - the EARLIER past"],
+                     "diagram": {"kind": "timeline", "items": [
+                         {"type": "point", "at": -0.75, "label": "he had left"},
+                         {"type": "point", "at": -0.3, "label": "I arrived"}]}},
+    "third_conditional": {"formula": ["If + had + V3, would have + V3  (imagined past)"],
+                          "diagram": {"kind": "flow", "items": ["If I had known", "→", "I would have come"]}},
+    "wish_regret": {"formula": ["wish + past  (now)", "wish + had + V3  (the past)"],
+                    "diagram": {"kind": "split", "left": {"title": "now", "lines": ["I wish I had time."]},
+                                "right": {"title": "past", "lines": ["I wish I had studied."]}}},
+    "reported_speech": {"formula": ["said (that) + one tense back"],
+                        "diagram": {"kind": "shift", "items": [["am", "was"], ["will", "would"],
+                                                               ["can", "could"], ["went", "had gone"]]}},
+    "modals_deduction": {"formula": ["must / might / can't + have + V3"],
+                         "diagram": {"kind": "ladder", "items": ["can't have", "might have", "must have"]}},
+    "passive_advanced": {"formula": ["has been + V3 · will be + V3", "It is said that…"],
+                         "diagram": {"kind": "flow", "items": ["They have done it", "→", "It has been done"]}},
+    "future_advanced": {"formula": ["will be + verb-ing  (in progress then)", "will have + V3  (finished by then)"],
+                        "diagram": {"kind": "timeline", "items": [
+                            {"type": "range", "from": 0.3, "to": 0.65, "label": "I'll be working"},
+                            {"type": "point", "at": 0.85, "label": "I'll have finished"}]}},
+    "discourse_markers": {"formula": ["however (contrast) · as a result (result)", "in fact (stronger) · on the other hand"],
+                          "diagram": {"kind": "flow", "items": ["It was cheap", "however,", "it broke"]}},
+    "collocations": {"formula": ["words that go together", "make a decision · heavy rain · take a risk"],
+                     "diagram": {"kind": "split", "left": {"title": "yes", "lines": ["heavy traffic", "make a decision"]},
+                                 "right": {"title": "no", "lines": ["big traffic", "do a decision"]}}},
+}
+
+
+def board_card(sid: str, skills: dict) -> dict:
+    """Everything the board shows when the tutor explains one skill."""
+    tip = skill_tip(sid, skills)
+    board = SKILL_BOARD.get(sid, {})
+    name, band, hint = skills.get(sid, (sid, "", ""))
+    # The board is kept simple: one easy sentence, the form in at most two
+    # lines, the picture, two examples.
+    return {"skill": sid, "title": name, "band": band, "hint": hint,
+            "rule": simple_rule(sid), "examples": tip.get("examples", [])[:2],
+            "formula": board.get("formula", [])[:2], "diagram": board.get("diagram")}
+
+
 def skill_tip(sid: str, skills: dict) -> dict:
     """{title, rule, examples} for the tip card - empty title if unknown."""
     rule, examples = SKILL_TIPS.get(sid, ("", []))
@@ -653,7 +784,7 @@ UNIT_METHODS = {
 }
 
 # Every unit carries its own techniques, so a unit is self-describing wherever
-# it travels — the prompt, the syllabus panel, the progress file.
+# it travels - the prompt, the syllabus panel, the progress file.
 for _stage in ENGLISH_STAGES:
     for _unit in _stage["units"]:
         _unit["methods"] = list(UNIT_METHODS.get(_unit["id"], ("ppp", "pushed_output")))
@@ -678,6 +809,8 @@ LEGACY_TOPIC_MAP: dict[str, str] = {
     "word order": "word_order", "adverb placement": "word_order",
     "prepositions": "prepositions", "prepositions of time": "prepositions",
     "prepositions of movement": "prepositions", "time expressions": "prepositions",
+    "dependent prepositions": "dependent_prepositions",
+    "verb + preposition": "dependent_prepositions",
     "articles": "articles",
     "collocations": "collocations", "lexical chunks": "collocations",
     "fixed expressions": "collocations",
@@ -773,3 +906,333 @@ def skills_up_to(lang: dict, stage_index: int) -> list[str]:
                 if sk not in seen:
                     seen.append(sk)
     return seen
+
+
+# ── The full grammar syllabus ────────────────────────────────────────────────
+# The skills above were the course's. These complete the list of the grammar a
+# speaker meets from A1 to B2, so that ANY rule the learner brings up - modal
+# verbs today, the possessive 's tomorrow - is on the syllabus, measured from
+# their own speech and explained on the board. Each entry: (name, band, hint),
+# its rule and examples, and what the board draws.
+
+_MORE_SKILLS: dict[str, tuple[str, str, str, str, list[str], dict]] = {
+    # ── A1 ──
+    "be_verb": ("to be (am / is / are)", "A1", "I am, she is, they are; isn't, aren't",
+                "Use am with I, is with he / she / it, are with you / we / they.",
+                ["I am from Baku.", "They aren't at home."],
+                {"formula": ["I am · he / she / it is · you / we / they are", "not: am not · isn't · aren't"],
+                 "diagram": {"kind": "split", "left": {"title": "one", "lines": ["I am", "she is", "it is"]},
+                             "right": {"title": "many", "lines": ["we are", "you are", "they are"]}}}),
+    "have_got": ("have / has got", "A1", "I have got a car; she has got two brothers",
+                 "Have got = have (own). he / she / it has got.",
+                 ["I've got a new phone.", "She hasn't got a car."],
+                 {"formula": ["I / you / we / they have got", "he / she / it has got"],
+                  "diagram": {"kind": "blocks", "items": ["She", "has got", "two brothers"]}}),
+    "there_is_are": ("there is / there are", "A1", "there is a bank; there are two shops",
+                     "There is + one thing, there are + many things - to say something exists.",
+                     ["There is a park near my house.", "There are three people in my team."],
+                     {"formula": ["there is + a / an + one", "there are + many"],
+                      "diagram": {"kind": "split", "left": {"title": "there is", "lines": ["a bank", "some water"]},
+                                  "right": {"title": "there are", "lines": ["two shops", "many cars"]}}}),
+    "imperatives": ("imperatives", "A1", "Sit down. Don't go. Let's start.",
+                    "Give an order or advice with the bare verb; don't + verb to stop someone.",
+                    ["Open the window, please.", "Don't worry."],
+                    {"formula": ["verb …!  ·  Don't + verb …!", "Let's + verb (us)"],
+                     "diagram": {"kind": "blocks", "items": ["Don't", "forget", "your keys"]}}),
+    "this_that": ("this / that / these / those", "A1", "this = near, that = far; these / those for many",
+                  "this / these for things near you, that / those for things far away.",
+                  ["This coffee is hot.", "Those people are my friends."],
+                  {"formula": ["near: this (one) · these (many)", "far: that (one) · those (many)"],
+                   "diagram": {"kind": "split", "left": {"title": "near", "lines": ["this book", "these books"]},
+                               "right": {"title": "far", "lines": ["that book", "those books"]}}}),
+    "can_ability": ("can / can't (ability)", "A1", "I can swim; can you drive?",
+                    "can + verb (no to, no -s) for what you are able to do.",
+                    ["I can speak three languages.", "Can you cook?"],
+                    {"formula": ["can / can't + verb", "Can + subject + verb?"],
+                     "diagram": {"kind": "blocks", "items": ["She", "can", "swim", "(no -s!)"]}}),
+    "possessive_case": ("possessive 's", "A1", "Taleh's car, my parents' house",
+                        "Add 's to show who owns something; after a plural -s, just add '.",
+                        ["This is my brother's room.", "My parents' house is big."],
+                        {"formula": ["one: name + 's (Taleh's car)", "plural -s: + ' (my parents' house)"],
+                         "diagram": {"kind": "flow", "items": ["the car of Taleh", "→", "Taleh's car"]}}),
+    "adverbs_frequency": ("adverbs of frequency", "A1", "always, usually, sometimes, never - before the main verb",
+                          "always / usually / often / sometimes / never go before the main verb, after be.",
+                          ["I usually get up at seven.", "She is never late."],
+                          {"formula": ["subject + always / usually / never + verb", "be + always / never"],
+                           "diagram": {"kind": "ladder", "items": ["never", "sometimes", "often", "usually", "always"]}}),
+    "question_words": ("question words", "A1", "what, where, when, who, why, how, which, whose",
+                       "Start a question with the word for what you want to know.",
+                       ["Where do you work?", "Why are you tired?"],
+                       {"formula": ["what (thing) · where (place) · when (time)", "who (person) · why (reason) · how (way)"],
+                        "diagram": {"kind": "blocks", "items": ["Where", "do", "you", "work", "?"]}}),
+    "like_ing": ("like / love / hate + -ing", "A1", "I like reading; she hates cooking",
+                 "After like, love, hate, enjoy use verb-ing.",
+                 ["I love swimming.", "He doesn't like waiting."],
+                 {"formula": ["like / love / hate / enjoy + verb-ing"],
+                  "diagram": {"kind": "blocks", "items": ["I", "enjoy", "reading", "(-ing)"]}}),
+    # ── A2 ──
+    # Not in / on / at: the small word that belongs to a verb or an adjective.
+    # Without its own rule these mistakes got the in / on / at board.
+    "dependent_prepositions": ("word + preposition (share with, listen to)", "A2",
+                               "a verb or adjective takes its own preposition: share with, listen to, good at",
+                               "Some words always take the same small word after them. Learn them together: "
+                               "share with, listen to, wait for, good at.",
+                               ["I want to share this with you.", "She is good at maths."],
+                               {"formula": ["verb + its word: share with · listen to · wait for · depend on",
+                                            "adjective + its word: good at · interested in · afraid of"],
+                                "diagram": {"kind": "split",
+                                            "left": {"title": "verb +", "lines": ["share with", "listen to", "wait for"]},
+                                            "right": {"title": "adjective +", "lines": ["good at", "interested in", "afraid of"]}}}),
+    "past_be": ("was / were", "A2", "I was tired; they were at home",
+                "The past of be: was with I / he / she / it, were with you / we / they.",
+                ["I was at work yesterday.", "Were you happy?"],
+                {"formula": ["I / he / she / it was", "you / we / they were"],
+                 "diagram": {"kind": "timeline", "items": [{"type": "point", "at": -0.5, "label": "I was tired"}]}}),
+    "present_continuous_future": ("present continuous for plans", "A2", "I'm meeting him tomorrow",
+                                  "Use am / is / are + -ing for a plan already arranged.",
+                                  ["I'm flying to Istanbul on Friday.", "What are you doing tonight?"],
+                                  {"formula": ["am / is / are + verb-ing + future time"],
+                                   "diagram": {"kind": "timeline", "items": [
+                                       {"type": "point", "at": 0.55, "label": "meeting him - arranged"}]}}),
+    "would_like": ("would like", "A2", "I'd like a coffee; would you like to come?",
+                   "would like = want, but polite. would like + noun / to + verb.",
+                   ["I'd like a glass of water.", "Would you like to join us?"],
+                   {"formula": ["would like + noun", "would like + to + verb"],
+                    "diagram": {"kind": "flow", "items": ["I want a coffee", "→", "I'd like a coffee"]}}),
+    "have_to": ("have to / don't have to", "A2", "I have to work; you don't have to come",
+                "have to = it is necessary; don't have to = it is not necessary (you can choose).",
+                ["I have to finish this today.", "You don't have to pay."],
+                {"formula": ["have / has to + verb", "don't / doesn't have to + verb"],
+                 "diagram": {"kind": "split", "left": {"title": "have to", "lines": ["necessary", "I have to go."]},
+                             "right": {"title": "don't have to", "lines": ["not necessary", "You don't have to."]}}}),
+    "too_enough": ("too / enough", "A2", "too hot; not old enough; enough money",
+                   "too + adjective = more than OK; adjective + enough / enough + noun = as much as needed.",
+                   ["It's too expensive.", "I don't have enough time."],
+                   {"formula": ["too + adjective", "adjective + enough · enough + noun"],
+                    "diagram": {"kind": "ladder", "items": ["not enough", "enough", "too much"]}}),
+    "adverbs_manner": ("adverbs of manner", "A2", "quickly, carefully, well - how you do it",
+                       "Most adverbs are adjective + -ly; good → well, fast → fast.",
+                       ["She speaks English well.", "Drive carefully."],
+                       {"formula": ["adjective + -ly (quick → quickly)", "good → well · fast → fast · hard → hard"],
+                        "diagram": {"kind": "flow", "items": ["a careful driver", "→", "drives carefully"]}}),
+    "could_past": ("could (past ability)", "A2", "I could swim when I was five",
+                   "could / couldn't + verb = was able / wasn't able in the past.",
+                   ["I could read when I was four.", "We couldn't find the hotel."],
+                   {"formula": ["could / couldn't + verb (past)"],
+                    "diagram": {"kind": "timeline", "items": [
+                        {"type": "range", "from": -0.9, "to": -0.35, "label": "I could swim"}]}}),
+    "some_any_compounds": ("something / anybody / nowhere", "A2", "something, anyone, nothing, everywhere",
+                           "some- in positive sentences, any- in questions and negatives, no- = not any.",
+                           ["I want something to eat.", "Is anybody home?"],
+                           {"formula": ["some- (+) · any- (? / -) · no- (= not any)", "-thing · -body / -one · -where"],
+                            "diagram": {"kind": "split", "left": {"title": "some-", "lines": ["something", "somebody"]},
+                                        "right": {"title": "any- / no-", "lines": ["anything?", "nobody"]}}}),
+    # ── B1 ──
+    "present_perfect_continuous": ("present perfect continuous", "B1", "I have been working here for two years",
+                                   "have / has been + -ing for an action that started in the past and is still going.",
+                                   ["I've been learning English for a year.", "How long have you been waiting?"],
+                                   {"formula": ["have / has been + verb-ing", "for + a period · since + a start"],
+                                    "diagram": {"kind": "timeline", "items": [
+                                        {"type": "range", "from": -0.75, "to": 0.02, "label": "been working - still"}]}}),
+    "zero_conditional": ("zero conditional", "B1", "If you heat ice, it melts",
+                         "If + present, present - for things that are always true.",
+                         ["If I drink coffee late, I can't sleep.", "If you press this, it stops."],
+                         {"formula": ["If + present, present  (always true)"],
+                          "diagram": {"kind": "flow", "items": ["If you heat ice", "→", "it melts"]}}),
+    "question_tags": ("question tags", "B1", "It's cold, isn't it? You don't smoke, do you?",
+                      "Positive sentence → negative tag; negative sentence → positive tag, same auxiliary.",
+                      ["You're a teacher, aren't you?", "She didn't call, did she?"],
+                      {"formula": ["positive …, negative tag?", "negative …, positive tag?"],
+                       "diagram": {"kind": "blocks", "items": ["It's cold,", "isn't", "it?"]}}),
+    "reflexive_pronouns": ("reflexive pronouns", "B1", "myself, yourself, themselves",
+                           "Use -self / -selves when the subject and object are the same person.",
+                           ["I cut myself.", "They enjoyed themselves."],
+                           {"formula": ["myself · yourself · himself · herself", "ourselves · yourselves · themselves"],
+                            "diagram": {"kind": "flow", "items": ["I hurt", "→", "myself"]}}),
+    "so_such": ("so / such", "B1", "so tired; such a long day",
+                "so + adjective, such (a) + adjective + noun - to make it stronger.",
+                ["I was so tired.", "It was such a nice day."],
+                {"formula": ["so + adjective", "such (a / an) + adjective + noun"],
+                 "diagram": {"kind": "split", "left": {"title": "so", "lines": ["so tired", "so fast"]},
+                             "right": {"title": "such", "lines": ["such a long day", "such good food"]}}}),
+    "indirect_questions": ("indirect questions", "B1", "Can you tell me where the station is?",
+                           "After 'Can you tell me / Do you know', use normal word order: subject + verb.",
+                           ["Do you know what time it is?", "Can you tell me where he lives?"],
+                           {"formula": ["Can you tell me / Do you know + wh- + subject + verb?"],
+                            "diagram": {"kind": "flow", "items": ["Where is the station?", "→", "…where the station is?"]}}),
+    "both_either_neither": ("both / either / neither", "B1", "both of them; either one; neither of us",
+                            "both = the two; either = one of the two; neither = not one and not the other.",
+                            ["Both options are good.", "Neither of us was ready."],
+                            {"formula": ["both (+ and) · either (+ or) · neither (+ nor)"],
+                             "diagram": {"kind": "blocks", "items": ["both = 2", "either = 1 of 2", "neither = 0"]}}),
+    "advice_modals": ("should / ought to / had better", "B1", "you should rest; you'd better go",
+                      "should / ought to = good idea; had better = strong advice (or there is a problem).",
+                      ["You should see a doctor.", "We'd better leave now."],
+                      {"formula": ["should / ought to + verb", "had better ('d better) + verb"],
+                       "diagram": {"kind": "ladder", "items": ["could", "should", "had better"]}}),
+    # ── B2 ──
+    "past_perfect_continuous": ("past perfect continuous", "B2", "I had been waiting for an hour when he came",
+                                "had been + -ing for an action going on BEFORE another past moment.",
+                                ["She had been working all day, so she was tired.", "We had been driving for hours."],
+                                {"formula": ["had been + verb-ing"],
+                                 "diagram": {"kind": "timeline", "items": [
+                                     {"type": "range", "from": -0.9, "to": -0.4, "label": "had been waiting"},
+                                     {"type": "point", "at": -0.4, "label": "he came"}]}}),
+    "mixed_conditionals": ("mixed conditionals", "B2", "If I had studied, I would be a doctor now",
+                           "Past condition → present result, or present condition → past result.",
+                           ["If I had taken that job, I would live in London now.",
+                            "If I were braver, I would have said something."],
+                           {"formula": ["If + had + V3, would + verb (now)", "If + past, would have + V3"],
+                            "diagram": {"kind": "flow", "items": ["If I had studied (past)", "→", "I would be… (now)"]}}),
+    "causative": ("have / get something done", "B2", "I had my car repaired",
+                  "have / get + object + V3 when someone else does it for you.",
+                  ["I had my hair cut yesterday.", "We're getting the kitchen painted."],
+                  {"formula": ["have / get + object + V3"],
+                   "diagram": {"kind": "flow", "items": ["The mechanic repaired my car", "→", "I had my car repaired"]}}),
+    "non_defining_relative": ("non-defining relative clauses", "B2", "My brother, who lives in Baku, is a doctor",
+                              "Extra information between commas: who / which (never that).",
+                              ["My phone, which I bought last year, is broken.", "Aysel, who works with me, is from Ganja."],
+                              {"formula": ["noun, who / which + extra information,"],
+                               "diagram": {"kind": "blocks", "items": ["My brother,", "who lives in Baku,", "is a doctor"]}}),
+    "participle_clauses": ("participle clauses", "B2", "Feeling tired, I went home",
+                           "Start with -ing (active) or V3 (passive) to join two actions with the same subject.",
+                           ["Walking home, I met an old friend.", "Built in 1900, the house is very old."],
+                           {"formula": ["Verb-ing …, subject + verb", "V3 …, subject + verb"],
+                            "diagram": {"kind": "flow", "items": ["I felt tired, so I went home", "→", "Feeling tired, I went home"]}}),
+    "be_used_to": ("be / get used to + -ing", "B2", "I'm used to getting up early",
+                   "be used to = it is normal for me; get used to = it is becoming normal. + noun / -ing.",
+                   ["I'm used to working at night.", "You'll get used to the weather."],
+                   {"formula": ["be / get used to + noun / verb-ing", "≠ used to + verb (past habit)"],
+                    "diagram": {"kind": "split", "left": {"title": "used to + verb", "lines": ["I used to smoke.", "past habit"]},
+                                "right": {"title": "be used to + -ing", "lines": ["I'm used to waking early.", "normal now"]}}}),
+    "past_modals": ("should have / needn't have", "B2", "I should have called; you needn't have come",
+                    "modal + have + V3 to judge the past: should have (a mistake), needn't have (unnecessary).",
+                    ["I should have studied more.", "You needn't have brought food."],
+                    {"formula": ["should / shouldn't have + V3", "needn't have + V3"],
+                     "diagram": {"kind": "timeline", "items": [
+                         {"type": "point", "at": -0.5, "label": "I didn't call"},
+                         {"type": "point", "at": 0, "label": "now: I should have called"}]}}),
+    "future_in_past": ("was going to / would", "B2", "I was going to call you, but…",
+                       "was / were going to + verb for a past plan that did not happen.",
+                       ["I was going to phone you, but I forgot.", "He said he would help."],
+                       {"formula": ["was / were going to + verb", "said (that) … would + verb"],
+                        "diagram": {"kind": "timeline", "items": [
+                            {"type": "point", "at": -0.7, "label": "the plan"},
+                            {"type": "cross", "at": -0.3, "label": "it didn't happen"}]}}),
+}
+
+# Folded into the one catalogue, so everything - the analyser, the board, the
+# syllabus - sees the full list. The course's own skills keep their ids, so a
+# learner's measured progress carries straight over.
+for _sid, (_name, _band, _hint, _rule, _examples, _board) in _MORE_SKILLS.items():
+    ENGLISH_SKILLS[_sid] = (_name, _band, _hint)
+    SKILL_TIPS[_sid] = (_rule, _examples)
+    SKILL_BOARD[_sid] = _board
+
+# The possessive 's has its own entry now.
+ENGLISH_SKILLS["pronouns_possessives"] = ("pronouns (I / me / my / mine)", "A1",
+                                          "subject, object and possessive: I / me / my / mine")
+
+# Some course skills belong one level down on a real syllabus.
+for _sid in ("present_simple", "questions", "articles", "plurals_quantity",
+             "prepositions", "pronouns_possessives"):
+    _name, _band, _hint = ENGLISH_SKILLS[_sid]
+    ENGLISH_SKILLS[_sid] = (_name, "A1", _hint)
+
+SYLLABUS_BANDS = ("A1", "A2", "B1", "B2")
+
+
+def skills_by_band(skills: dict) -> dict[str, list[str]]:
+    """The syllabus: every skill id, grouped by level, in teaching order."""
+    out: dict[str, list[str]] = {b: [] for b in SYLLABUS_BANDS}
+    for sid, (_name, band, _hint) in skills.items():
+        out.setdefault(band, []).append(sid)
+    return out
+
+
+# ── The rule in one simple sentence ──────────────────────────────────────────
+# What the board and the tutor say first: A2 words, one idea, no grammar terms
+# the learner has not met. The longer rule (SKILL_TIPS) stays for the account
+# page.
+
+SIMPLE_RULES: dict[str, str] = {
+    # A1
+    "be_verb": "I am, he / she / it is, we / you / they are.",
+    "have_got": "Have got means have. With he / she / it: has got.",
+    "there_is_are": "There is for one thing, there are for many things.",
+    "imperatives": "To tell someone to do something, start with the verb: Sit down!",
+    "this_that": "This and these are near you. That and those are far.",
+    "can_ability": "Can + verb says what you are able to do. No 'to', no -s.",
+    "possessive_case": "Add 's to a name to show it is theirs: Taleh's car.",
+    "adverbs_frequency": "Always, usually, never go before the main verb.",
+    "question_words": "Start the question with the word for what you want to know.",
+    "like_ing": "After like, love and hate, the verb takes -ing.",
+    "present_simple": "For habits and facts. With he / she / it, add -s.",
+    "questions": "In a question, do / does / did comes before the person.",
+    "articles": "A for something new. The for something we both know.",
+    "plurals_quantity": "Many for things you can count, much for things you can't.",
+    "prepositions": "In for big times and places, on for days, at for exact points.",
+    "dependent_prepositions": "Some words always take the same small word after them: share with, listen to, good at.",
+    "pronouns_possessives": "I, me, my, mine - the same person in different jobs.",
+    # A2
+    "present_continuous": "For what is happening right now: am / is / are + -ing.",
+    "past_simple": "For finished actions in the past: add -ed, or use the special past form.",
+    "future_forms": "Going to for plans, will for things you decide now.",
+    "word_order": "Who, then the action, then what, then where, then when.",
+    "subject_verb_agreement": "One person: she works. Many people: they work.",
+    "comparatives": "Short words add -er, long words use more.",
+    "modals_basic": "Can, must, should + verb. Never 'to' after them.",
+    "linking_words": "And adds, but shows the opposite, because gives the reason.",
+    "word_choice": "Some words go together: make a decision, do homework.",
+    "past_be": "The past of am / is is was; the past of are is were.",
+    "present_continuous_future": "Am / is / are + -ing can also be a plan for the future.",
+    "would_like": "Would like is a polite way to say want.",
+    "have_to": "Have to: you must. Don't have to: it is not needed.",
+    "too_enough": "Too means more than OK. Enough means as much as you need.",
+    "adverbs_manner": "To say HOW you do something, add -ly: quick - quickly.",
+    "could_past": "Could is the past of can.",
+    "some_any_compounds": "Something in normal sentences, anything in questions and with not.",
+    # B1
+    "present_perfect": "Have + past participle: it happened before, it matters now.",
+    "perfect_vs_past": "With a finished time (yesterday), use the past. Without a time, use have + done.",
+    "past_continuous": "Was / were + -ing: something was going on when another thing happened.",
+    "used_to": "Used to + verb: you did it often before, but not now.",
+    "first_conditional": "If + now, will + verb: a real result in the future.",
+    "modals_possibility": "Might and could mean maybe.",
+    "second_conditional": "If + past, would + verb: an imagined situation now.",
+    "gerund_infinitive": "Some verbs take -ing (enjoy cooking), some take to (want to cook).",
+    "phrasal_verbs": "Verb + small word = a new meaning: give up = stop trying.",
+    "relative_clauses": "Who for people, which or that for things - it says WHICH one.",
+    "passive_simple": "Be + past participle, when the action is more important than who did it.",
+    "word_forms": "One word, different jobs: happy (describes), happiness (a thing), happily (how).",
+    "present_perfect_continuous": "Have been + -ing: it started before and it is still going on.",
+    "zero_conditional": "If + now, now: something that is always true.",
+    "question_tags": "A small question at the end: It's cold, isn't it?",
+    "reflexive_pronouns": "Myself, yourself: when you do something to yourself.",
+    "so_such": "So + describing word, such + a + describing word + thing.",
+    "indirect_questions": "Can you tell me where the station is? - normal order after the start.",
+    "both_either_neither": "Both = the two, either = one of two, neither = not one of them.",
+    "advice_modals": "Should = a good idea. Had better = a strong warning.",
+    # B2
+    "past_perfect": "Had + past participle: the thing that happened FIRST in the past.",
+    "third_conditional": "If + had done, would have done: imagining a different past.",
+    "wish_regret": "Wish + past: you want now to be different.",
+    "reported_speech": "When you tell what someone said, the verb goes one step back.",
+    "modals_deduction": "Must have, might have, can't have: guessing about the past.",
+    "passive_advanced": "Has been done, will be done: the passive in other tenses.",
+    "future_advanced": "Will be doing: in the middle of it then. Will have done: finished by then.",
+    "discourse_markers": "However, as a result, in fact: words that connect your ideas.",
+    "collocations": "Words that go together: heavy rain, make a mistake.",
+    "past_perfect_continuous": "Had been + -ing: it was going on before another past moment.",
+    "mixed_conditionals": "A different past with a result now: If I had studied, I would be a doctor.",
+    "causative": "Have / get something done: someone else does it for you.",
+    "non_defining_relative": "Extra information between commas, with who or which.",
+    "participle_clauses": "Start with -ing to join two actions: Feeling tired, I went home.",
+    "be_used_to": "Be used to + -ing: it is normal for you now.",
+    "past_modals": "Should have done: it was a mistake not to do it.",
+    "future_in_past": "Was going to: a plan in the past that did not happen.",
+}
+
+
+def simple_rule(sid: str) -> str:
+    return SIMPLE_RULES.get(sid) or SKILL_TIPS.get(sid, ("", []))[0]

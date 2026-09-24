@@ -1,9 +1,9 @@
 """
 Plugin discovery, validation, collision detection, and dispatch.
 
-Discovery runs once (LangVisLive.__init__ calls discover_plugins()); the resulting
+Discovery runs once (core/live.LiveSession calls discover_plugins()); the resulting
 PluginRegistry is cached for the process lifetime. Enable/disable state is re-read
-from config on every call to get_tool_declarations() / run() / list_for_ui(), so
+from config on every call to get_tool_declarations() / run(), so
 toggling a plugin does not require restarting the app or re-importing anything.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ class PluginRegistry:
         self._all_records: list[PluginRecord] = []   # valid + invalid, for UI listing
         self._logger = logger
 
-    # -- called by main.py at LiveConnectConfig build time --
+    # -- called by core/live.py at LiveConnectConfig build time --
     def get_tool_declarations(self) -> list[dict]:
         decls = []
         for name, rec in self._plugins.items():
@@ -58,7 +58,7 @@ class PluginRegistry:
     def has(self, name: str) -> bool:
         return name in self._plugins
 
-    # -- called by main.py from _execute_tool's else branch --
+    # -- called by core/live.py from _execute_tool's else branch --
     def run(self, name: str, parameters: dict, player=None, session_memory=None) -> str:
         rec = self._plugins.get(name)
         if rec is None or not rec.valid:
@@ -72,14 +72,14 @@ class PluginRegistry:
             traceback.print_exc()
             return f"Sir, the '{name}' plugin failed: {e}"
 
-    # -- called by main.py for every user utterance --
+    # -- called by core/live.py for every user utterance --
     def observe(self, text: str, player=None) -> None:
         """Hand what the user just said to every enabled plugin that declares a
         module-level observe(text, player).
 
         Tools are pull: the model decides to call them. A plugin that has to
         react to what was said REGARDLESS of whether the model thought to
-        mention it — a language coach, a monitor watching for a keyword — has
+        mention it - a language coach, a monitor watching for a keyword - has
         no way in through the tool path. This is that way in.
 
         Called from the live session's receive loop, so it must be cheap and it
@@ -99,12 +99,12 @@ class PluginRegistry:
             except Exception as e:
                 self._logger(f"Plugin '{name}' observe() failed: {e}")
 
-    # -- called by main.py when it builds the session's system instruction --
+    # -- called by core/live.py when it builds the session's system instruction --
     def prompt_blocks(self) -> list[str]:
         """Standing instructions plugins want in every session.
 
         A tool description says when to CALL something. It cannot say how the
-        assistant should behave the rest of the time — and a plugin whose whole
+        assistant should behave the rest of the time - and a plugin whose whole
         job is to change that (the English coach pitching every sentence at the
         learner's level) needs exactly that. Collected fresh on each connect, so
         a block that depends on changing state stays current.
@@ -123,7 +123,7 @@ class PluginRegistry:
                 self._logger(f"Plugin '{name}' format_for_prompt() failed: {e}")
         return blocks
 
-    # -- called by ui.py's settings tab to render per-plugin config forms --
+    # -- called by the web settings form (web/server.py) --
     def settings_schemas(self) -> list[dict]:
         """One entry per settings SECTION, for enabled plugins that declare a
         PLUGIN_SETTINGS schema. Sections are deduped by namespace so a suite of
@@ -146,20 +146,6 @@ class PluginRegistry:
                 "fields":    rec.settings.get("fields", []),
                 "values":    get_plugin_config(ns),
                 "action":    rec.settings.get("action"),   # optional test/connect button
-            })
-        return out
-
-    # -- called by ui.py's Plugin Manager overlay --
-    def list_for_ui(self) -> list[dict]:
-        out = []
-        for rec in self._all_records:
-            out.append({
-                "name": rec.name,
-                "description": rec.description,
-                "file": rec.file,
-                "valid": rec.valid,
-                "error": rec.error,
-                "enabled": get_plugin_enabled(rec.name) if rec.valid else False,
             })
         return out
 
@@ -206,7 +192,7 @@ def _validate(module, filename: str) -> PluginRecord:
                              error="Missing callable run(parameters, ...) function.")
 
     # Optional, self-describing settings schema (rendered by the settings UI).
-    # A malformed schema is ignored, never fatal — the plugin still loads.
+    # A malformed schema is ignored, never fatal - the plugin still loads.
     settings = getattr(module, "PLUGIN_SETTINGS", None)
     if not (isinstance(settings, dict) and isinstance(settings.get("fields"), list)):
         settings = None
@@ -233,7 +219,7 @@ def discover_plugins(plugins_dir: Path, core_tool_names: set[str],
     Scans plugins_dir for *.py files (skips files starting with '_', e.g. __init__.py,
     _template.py, and any shared-helper modules an author prefixes with '_').
     Import errors, validation errors, and name collisions are logged and the offending
-    file is skipped — they NEVER raise out of this function and never abort the scan
+    file is skipped - they NEVER raise out of this function and never abort the scan
     of remaining files.
     """
     plugins_dir.mkdir(parents=True, exist_ok=True)
@@ -261,11 +247,11 @@ def discover_plugins(plugins_dir: Path, core_tool_names: set[str],
 
             if rec.valid and rec.name in core_tool_names:
                 rec = PluginRecord(name=rec.name, file=path.name,
-                                    error=f"Name '{rec.name}' collides with a core tool — rejected.")
+                                    error=f"Name '{rec.name}' collides with a core tool - rejected.")
             elif rec.valid and rec.name in valid:
                 other = valid[rec.name].file
                 rec = PluginRecord(name=rec.name, file=path.name,
-                                    error=f"Name '{rec.name}' already used by plugin '{other}' — rejected.")
+                                    error=f"Name '{rec.name}' already used by plugin '{other}' - rejected.")
 
         except Exception as e:
             rec = PluginRecord(name=path.stem, file=path.name,
@@ -277,7 +263,7 @@ def discover_plugins(plugins_dir: Path, core_tool_names: set[str],
             valid[rec.name] = rec
             logger(f"Plugin loaded: {rec.name} ({path.name})")
         else:
-            logger(f"Plugin rejected: {path.name} — {rec.error}")
+            logger(f"Plugin rejected: {path.name} - {rec.error}")
 
     registry = PluginRegistry(valid, logger)
     registry._all_records = all_records

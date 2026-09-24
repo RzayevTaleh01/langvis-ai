@@ -8,7 +8,7 @@ config/api_keys.json
 # what the tutor remembers about you
 memory/long_term.json
 memory/*.db
-# your own speech, transcribed, scored and tracked — local only
+# your own speech, transcribed, scored and tracked - local only
 english/
 slovak/
 

@@ -21,7 +21,7 @@ MAX_VALUE_LENGTH = 380
 #
 # There used to be one: MEMORY_MAX_CHARS = 2200, applied to the whole store. It
 # was a *storage* limit, and it existed only because the entire memory was
-# pasted into the system prompt on every connect — so growing the memory grew
+# pasted into the system prompt on every connect - so growing the memory grew
 # every single request. When it filled, _trim_to_limit() deleted the oldest
 # entries and printed one line to a console nobody reads. A memory described as
 # "deeply remembers projects, preferences and personal context" was in practice
@@ -29,14 +29,14 @@ MAX_VALUE_LENGTH = 380
 #
 # Storage and prompt budget are now separate concerns:
 #
-#   MEMORY_MAX_CHARS  — a runaway guard, not a feature limit. Nothing normal
+#   MEMORY_MAX_CHARS  - a runaway guard, not a feature limit. Nothing normal
 #                       reaches it; a bug writing in a loop does.
-#   PROMPT_CORE_CHARS — what actually rides in the system prompt every session.
+#   PROMPT_CORE_CHARS - what actually rides in the system prompt every session.
 #                       Smaller than the old whole-memory dump, so sessions
 #                       start *faster* than before, not slower.
 #
 # Everything above the core stays on disk and is fetched on demand by the
-# recall_memory tool — see search_memory() and format_memory_for_prompt().
+# recall_memory tool - see search_memory() and format_memory_for_prompt().
 MEMORY_MAX_CHARS  = 200_000
 PROMPT_CORE_CHARS = 900
 PROMPT_INDEX_CHARS = 420
@@ -82,7 +82,7 @@ def _all_entries(memory: dict) -> list[tuple]:
     return entries
 
 
-# Set by main.py so a trim can reach the activity log. Deleting something a
+# Set by core/live.py so a trim can reach the activity log. Deleting something a
 # person told you and mentioning it only on stdout is how a memory loses trust.
 _trim_notifier = None
 
@@ -108,7 +108,7 @@ def _trim_to_limit(memory: dict) -> dict:
     if dropped and _trim_notifier:
         try:
             _trim_notifier(
-                f"SYS: Memory full — forgot {len(dropped)} oldest entries "
+                f"SYS: Memory full - forgot {len(dropped)} oldest entries "
                 f"({', '.join(dropped[:3])}{'…' if len(dropped) > 3 else ''})"
             )
         except Exception:
@@ -229,7 +229,7 @@ def format_memory_for_prompt(memory: dict | None) -> str:
             # English" line written months ago reads like a standing order and
             # was one of the reasons a Turkish question came back in English.
             core_lines.append(
-                f"Has spoken to you in: {val} (an observation about the past — "
+                f"Has spoken to you in: {val} (an observation about the past - "
                 f"always answer in the language of their CURRENT message)")
         else:
             core_lines.append(f"{field.title()}: {val}")
@@ -257,7 +257,7 @@ def format_memory_for_prompt(memory: dict | None) -> str:
 
     # Recency decides order, but no single category may take the whole budget.
     # Without the cap, someone with forty stored preferences gets a prompt that
-    # is forty preferences and not one person's name — the categories that
+    # is forty preferences and not one person's name - the categories that
     # matter most in conversation are also the ones that change least often, so
     # pure recency systematically buries them.
     per_cat_used: dict[str, int] = {}
@@ -274,8 +274,8 @@ def format_memory_for_prompt(memory: dict | None) -> str:
     # The index is a table of contents, so it is interleaved across categories
     # rather than continuing in recency order. Sorted by recency it would list
     # twenty-four preferences before the first relationship, and the one entry
-    # the index exists for — the old fact the model has no other way to know
-    # about — would fall off the end.
+    # the index exists for - the old fact the model has no other way to know
+    # about - would fall off the end.
     indexed: list[str] = []
     if overflow:
         cats  = [c for c in _CATEGORY_LABELS if overflow.get(c)]
@@ -299,7 +299,7 @@ def format_memory_for_prompt(memory: dict | None) -> str:
         return ""
 
     out = [
-        "[WHAT YOU KNOW ABOUT THIS PERSON — use naturally, never recite like a list]",
+        "[WHAT YOU KNOW ABOUT THIS PERSON - use naturally, never recite like a list]",
         *core_lines,
     ]
 
@@ -314,7 +314,7 @@ def format_memory_for_prompt(memory: dict | None) -> str:
         if names:
             out.append("")
             out.append(
-                "[ALSO REMEMBERED — values not shown here. Call recall_memory "
+                "[ALSO REMEMBERED - values not shown here. Call recall_memory "
                 "with a keyword to read any of these before saying you do not know]"
             )
             out.append(", ".join(names)
@@ -375,7 +375,7 @@ def search_memory(query: str, limit: int = 8) -> str:
     lines = [f"{cat}/{_pretty(key)}: {val}" for _s, cat, key, val in rows[:max(1, limit)]]
     head  = (f"Stored facts matching '{query}':" if query
              else "Everything currently stored:")
-    more  = (f"\n(+{len(rows) - len(lines)} more — search with a narrower keyword)"
+    more  = (f"\n(+{len(rows) - len(lines)} more - search with a narrower keyword)"
              if len(rows) > len(lines) else "")
     return head + "\n" + "\n".join(lines) + more
 
@@ -463,7 +463,7 @@ def pop_last_session() -> dict | None:
 
     This used to delete the entry. That stopped the morning briefing repeating
     itself, but it also threw away the assistant's own history of every
-    conversation it had ever had — the one thing that would let it say "last
+    conversation it had ever had - the one thing that would let it say "last
     week you were stuck on this same file". Marking prevents the repeat;
     deleting was discarding the archive in order to solve it.
     """

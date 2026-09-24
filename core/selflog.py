@@ -1,5 +1,5 @@
 """
-core/selflog.py — the assistant's own record of what it printed.
+core/selflog.py - the assistant's own record of what it printed.
 
 WHY THIS EXISTS
     Everything LangVis knows about its own failures went to stdout. If it was
@@ -11,7 +11,7 @@ WHY THIS EXISTS
     So a crash could happen twice in a row and the second time the assistant
     was as surprised as the first.
 
-    This tees stdout and stderr — every print, every traceback — into two
+    This tees stdout and stderr - every print, every traceback - into two
     places: a real file on disk, and a ring buffer in memory the model can be
     handed on request. Nothing at the call sites changes; installing the tee is
     the whole integration.
@@ -52,7 +52,7 @@ _ring: deque = deque(maxlen=RING_SIZE)
 _lock = threading.Lock()
 _installed = False
 
-# A line worth showing when asked "what went wrong". Deliberately broad — a
+# A line worth showing when asked "what went wrong". Deliberately broad - a
 # missed error is worse than one extra line of context.
 _ERROR_RE = re.compile(
     r"traceback|exception|error|❌|⚠️|failed|refus|denied|cannot |could not |"
@@ -61,8 +61,8 @@ _ERROR_RE = re.compile(
 )
 # Lines that match the pattern but are routine and would drown the signal.
 #
-# "📤" is the tool-result line main.py prints. Excluding it matters for more
-# than tidiness: self_check returns error text, main.py echoes that result to
+# "📤" is the tool-result line core/live.py prints. Excluding it matters for more
+# than tidiness: self_check returns error text, core/live.py echoes that result to
 # stdout, and the echo would be captured as a fresh error for the next
 # self_check to report. Tool outcomes belong to the conversation and the
 # journal; this log is for LangVis's own faults.
@@ -185,7 +185,7 @@ def error_count() -> int:
 
 
 def file_tail(limit: int = 120) -> list[str]:
-    """The last lines from disk — survives a restart, unlike the ring."""
+    """The last lines from disk - survives a restart, unlike the ring."""
     try:
         text = LOG_PATH.read_text(encoding="utf-8", errors="replace")
     except Exception:
