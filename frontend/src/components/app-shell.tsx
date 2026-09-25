@@ -10,6 +10,7 @@ import { useAuth } from "@/components/auth-provider";
 import { LiveProvider, useLive } from "@/components/live-provider";
 import { Header } from "@/components/header";
 import { ContentDialog, KeyDialog } from "@/components/dialogs";
+import { Button } from "@/components/ui/button";
 
 const GUEST_PAGES = ["/", "/login/", "/register/"];
 const AUTH_PAGES = ["/login/", "/register/"];
@@ -72,8 +73,8 @@ function GuestHeader({ authPage, path }: { authPage: boolean; path: string }) {
           <a href="#courses">Courses</a>
         </nav>
       )}
-      {path !== "/login/" && <Link className="btn ghost" href="/login/">Log in</Link>}
-      {path !== "/register/" && <Link className="btn primary small-cta" href="/register/">Sign up free</Link>}
+      {path !== "/login/" && <Button asChild variant="ghost"><Link href="/login/">Log in</Link></Button>}
+      {path !== "/register/" && <Button asChild><Link href="/register/">Sign up free</Link></Button>}
     </header>
   );
 }
@@ -89,7 +90,7 @@ function SeatNotice() {
         <p><strong>{seatTakenBy}</strong> signed in on this computer, so your lesson was stopped.
           Your progress is saved.</p>
         <div className="seat-actions">
-          <button className="btn primary" type="button" onClick={() => window.location.reload()}>Use it here again</button>
+          <Button type="button" onClick={() => window.location.reload()}>Use it here again</Button>
         </div>
       </div>
     </div>

@@ -5,11 +5,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { postJson } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
-const LANGUAGES = [
-  { name: "English", note: "A2 → B1 · explained simply" },
-  { name: "Slovak", note: "A1 → B1 · from zero" },
-];
+// The language to learn comes from the course card ("Learn Slovak" opens
+// /register/?learn=Slovak); it can be changed later from the header.
+const LANGUAGES = ["English", "Slovak"];
 
 // Only a page of this site: never an address from outside.
 function nextPage(): string {
@@ -23,9 +24,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Only ever rendered in the browser (the shell waits for the account first).
-  const [learning, setLearning] = useState(() => {
+  const [learning] = useState(() => {
     const learn = new URLSearchParams(window.location.search).get("learn");
-    return LANGUAGES.some((l) => l.name === learn) ? (learn as string) : "English";
+    return learn && LANGUAGES.includes(learn) ? learn : "English";
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,44 +61,28 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {register && (
           <label className="auth-field">
             <span>Your name</span>
-            <input className="input" type="text" autoComplete="name" required maxLength={40}
+            <Input className="h-10" type="text" autoComplete="name" required maxLength={40}
                    value={name} onChange={(e) => setName(e.target.value)} placeholder="The tutor calls you by it" />
           </label>
         )}
         <label className="auth-field">
           <span>Email</span>
-          <input className="input" type="email" autoComplete="email" required
+          <Input className="h-10" type="email" autoComplete="email" required
                  value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="auth-field">
           <span>Password</span>
-          <input className="input" type="password" required minLength={register ? 8 : undefined}
+          <Input className="h-10" type="password" required minLength={register ? 8 : undefined}
                  autoComplete={register ? "new-password" : "current-password"}
                  value={password} onChange={(e) => setPassword(e.target.value)}
                  placeholder={register ? "At least 8 characters" : ""} />
         </label>
 
-        {register && (
-          <fieldset className="auth-field">
-            <span>I want to learn</span>
-            <div className="auth-langs">
-              {LANGUAGES.map((l) => (
-                <button type="button" key={l.name} aria-pressed={learning === l.name}
-                        className={"lang-option" + (learning === l.name ? " current" : "")}
-                        onClick={() => setLearning(l.name)}>
-                  <strong>{l.name}</strong>
-                  <span className="lang-option-note">{l.note}</span>
-                </button>
-              ))}
-            </div>
-          </fieldset>
-        )}
-
         {error && <p className="auth-error" role="alert">{error}</p>}
 
-        <button className="btn primary auth-submit" type="submit" disabled={busy}>
+        <Button className="auth-submit" type="submit" disabled={busy}>
           {busy ? "One moment…" : register ? "Create account" : "Log in"}
-        </button>
+        </Button>
 
         <p className="auth-switch">
           {register ? "Already have an account? " : "New to LangVis? "}

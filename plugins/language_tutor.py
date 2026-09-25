@@ -106,8 +106,8 @@ PLUGIN_SETTINGS = {
         {"key": "native_language", "type": "choice", "label": "My own language",
          "options": ["Azerbaijani", "Turkish", "Russian"], "default": "Azerbaijani"},
         {"key": "starting_level", "type": "choice",
-         "label": "My level right now (until enough is measured)",
-         "options": ["A1", "A2", "B1", "B2"], "default": "A2"},
+         "label": "Start from level (for the language you are learning)",
+         "options": ["A1", "A2", "B1", "B2"], "default": "A1"},
         {"key": "goal_level", "type": "choice", "label": "Goal",
          "options": ["B1", "B2", "C1"], "default": "B2"},
         {"key": "pace", "type": "choice", "label": "How fast the tutor speaks",
@@ -181,9 +181,9 @@ def _load(lang: dict | None = None) -> dict:
     new = not path.exists()
     state = pg.load(path)
     if new or not state.get("declared_level"):
-        # A language never studied before starts at its course's first level.
-        state["declared_level"] = (lang.get("start_level")
-                                   or str(_setting("starting_level", "A2")).upper())
+        # A language never studied before starts at A1, until the learner
+        # picks another starting level in Settings.
+        state["declared_level"] = "A1"
     return state
 
 
@@ -1981,6 +1981,13 @@ def _intensive_save(data: dict, lang: dict | None = None) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _lesson_open(n: int, prog: dict, idx: int) -> bool:
+    """A lesson can be opened when every lesson before it is done - or when it
+    is at or before the lesson they are on (a learner who started at A2 may
+    still look back at A1)."""
+    return n <= max(len(prog.get("done") or []), idx)
+
+
 def _current_lesson(prog: dict | None = None) -> tuple[int, dict] | None:
     course = _course()
     if not course:
@@ -2216,7 +2223,7 @@ def _intensive_status() -> dict:
             "step": step, "steps": len(steps), "sections": sections,
             "lessons": [{"index": n, "week": l["week"], "title": l["title"], "band": l["band"],
                          "state": "done" if l["id"] in done else ("current" if n == idx else "locked"),
-                         "open": n <= len(done)} for n, l in enumerate(course.get("lessons", []))],
+                         "open": _lesson_open(n, prog, idx)} for n, l in enumerate(course.get("lessons", []))],
             "weeks": course.get("weeks", [])}
 
 
@@ -2341,7 +2348,7 @@ def course_for_ui(key: str) -> dict:
                      "current" if n == prog["current"] else "locked")
             lessons.append({"index": n, "week": int(l["week"]), "day": int(l["day"]), "band": l["band"],
                             "title": l["title"], "goal": l["goal"], "state": state,
-                            "open": n <= prog["done"],
+                            "open": n <= max(prog["done"], prog["current"]),
                             "grammar": (l.get("grammar") or {}).get("name", ""),
                             "words": [w["text"] for w in l.get("words") or []],
                             "speak": l.get("speak", "")})
@@ -2374,7 +2381,7 @@ def intensive_for_ui() -> dict:
                  "current" if n == idx else "locked")
         lessons.append({"index": n, "id": l["id"], "week": l["week"], "day": l["day"],
                         "band": l["band"], "title": l["title"], "goal": l["goal"], "state": state,
-                        "open": n <= len(prog["done"]), "words": [w["text"] for w in l["words"]]})
+                        "open": _lesson_open(n, prog, idx), "words": [w["text"] for w in l["words"]]})
     steps = len(_teach_steps(_lesson_pack(idx, course["lessons"][idx])))
     return {"available": True, "active": active, "language": _lang()["name"], "courses": courses,
             "title": course["title"], "weeks": course["weeks"], "lessons": lessons,
@@ -3355,9 +3362,26 @@ def _set_level(level: str) -> str:
     with _lock:
         state = _load(lang)
         state["declared_level"] = level
+        # Everything starts again from this level: the measured level, the
+        # topic course stage and the course lesson. Words and mistakes stay.
+        state["samples"] = []
+        state.setdefault("totals", {})["scored"] = 0
+        stages = lang.get("stages") or []
+        si = next((i for i, st in enumerate(stages)
+                   if cur.band_index(st.get("band", "")) >= cur.band_index(level)),
+                  max(0, len(stages) - 1))
+        state["course"] = dict(pg._empty_course(), stage=si)
         _save(state, lang)
+    course = _course()
+    if course:
+        lessons = course["lessons"]
+        first = next((n for n, l in enumerate(lessons)
+                      if cur.band_index(l["band"]) >= cur.band_index(level)), len(lessons) - 1)
+        prog = _intensive_load(lang)
+        prog["lesson"], prog["step"] = first, 0
+        _intensive_save(prog, lang)
     _save_setting({"starting_level": level})
-    return f"Stated level set to {level}. It counts until enough speech is measured."
+    return f"The learner now starts from {level}: level, lessons and course all begin there."
 
 
 def _set_goal(level: str) -> str:
@@ -3388,6 +3412,7 @@ def set_language(name: str) -> tuple[bool, str]:
     if key == _mode_key():
         return True, f"Already learning {lang['name']}."
     _save_setting({"mode": lang["name"]})
+    _sync_level_setting()
     return True, f"Switched to {lang['name']}."
 
 
@@ -3401,7 +3426,20 @@ def _set_mode(mode: str) -> str:
         return (f"{lang['name']} mode is not available yet - it is coming soon. "
                 f"Tell the learner simply, and continue in {_lang()['name']}.")
     _save_setting({"mode": lang["name"]})
+    _sync_level_setting()
     return f"Mode is {lang['name']}."
+
+
+def _sync_level_setting() -> None:
+    """Each language keeps its own starting level: after a switch, Settings
+    shows the level of the language now being learned."""
+    try:
+        lang = _lang()
+        with _lock:
+            level = _load(lang).get("declared_level") or "A1"
+        _save_setting({"starting_level": level})
+    except Exception as e:
+        print(f"[Tutor] level sync failed: {e}")
 
 
 def _save_setting(values: dict) -> None:

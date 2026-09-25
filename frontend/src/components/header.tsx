@@ -5,6 +5,7 @@
 // menu (settings, sign out) on the right.
 
 import Link from "next/link";
+import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -13,6 +14,7 @@ import { BookIcon, ChatIcon, GearIcon, GlobeIcon, GrammarIcon, HomeIcon, TopicIc
 import { useLive } from "@/components/live-provider";
 import { firstName, useAuth } from "@/components/auth-provider";
 import { CustomTopicDialog, SettingsDialog, UnitsDialog } from "@/components/dialogs";
+import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/", page: "home", label: "Home", Icon: HomeIcon },
@@ -46,11 +48,12 @@ export function Header() {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="chip chip-btn lang-chip dropdown-toggle" type="button"
+          <Button variant="outline" size="sm" className="lang-chip" type="button"
                   title="The language you are learning - each has its own level and progress">
             <GlobeIcon />
             <span id="lang-name">{active ? active.name : "Language"}</span>
-          </button>
+            <ChevronDownIcon className="size-3.5 opacity-60" />
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[220px]">
           <DropdownMenuLabel className="text-[11px] tracking-[.08em] uppercase text-muted-foreground">
@@ -66,7 +69,7 @@ export function Header() {
       </DropdownMenu>
 
       <div className="chip" id="chip-level" title="Your measured level">
-        {status.level ? <><strong>{status.level}</strong>{` · ${status.score}/100 → ${status.goal}`}</> : "-"}
+        {status.level ? <><strong>{status.level}</strong>{` → ${status.goal}`}</> : "-"}
       </div>
 
       <div className="spacer" />
@@ -74,12 +77,12 @@ export function Header() {
       {page === "tutor" && (
         <>
           <TopicMenu onOwn={(t) => setTopicDialog({ open: true, topic: t })} />
-          <button className="topic-pick grammar-pick" id="chip-unit" type="button"
+          <Button variant="secondary" size="sm" className="topic-pick grammar-pick" id="chip-unit" type="button"
                   title="The whole grammar syllabus and how well you know each rule"
                   onClick={() => setUnitsOpen(true)}>
             <GrammarIcon />
             <span id="unit-name">{g.total ? `Grammar · ${g.strong}/${g.total} known · ${g.weak} weak` : "Grammar"}</span>
-          </button>
+          </Button>
         </>
       )}
 
@@ -109,10 +112,10 @@ function UserMenu({ onSettings }: { onSettings: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="user-btn" type="button" title={`Signed in as ${user.email}`} aria-label="Your account">
+        <Button variant="outline" className="user-btn pl-1" type="button" title={`Signed in as ${user.email}`} aria-label="Your account">
           <span className="user-avatar" aria-hidden="true">{(user.name || "?").charAt(0).toUpperCase()}</span>
           <span className="user-first">{firstName(user)}</span>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[230px]">
         <div className="px-2 py-1.5">
@@ -146,19 +149,20 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
         </span>
         <span className="text-xs text-muted-foreground">{t.custom ? "my topic" : ""}</span>
       </DropdownMenuItem>
-      <button type="button" className="topic-edit" aria-label={`Scenario for ${t.name}`}
+      <Button variant="ghost" size="icon-sm" type="button" aria-label={`Scenario for ${t.name}`}
               title={t.prompt ? `Scenario: ${t.prompt}` : "Add a scenario for this topic"}
               onClick={(e) => { e.stopPropagation(); onOwn(t); }}>
         {t.prompt ? "✎•" : "✎"}
-      </button>
+      </Button>
       {t.started && t.id !== "free" && (
-        <button type="button" className="topic-del" aria-label={`Delete topic ${t.name}`} title={`Delete ${t.name}`}
+        <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
+                aria-label={`Delete topic ${t.name}`} title={`Delete ${t.name}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (confirm(`Delete the topic "${t.name}"? Its words stay in your dictionary.`)) {
                     send({ type: "delete_topic", id: t.id });
                   }
-                }}>✕</button>
+                }}>✕</Button>
       )}
     </div>
   );
@@ -166,10 +170,11 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="topic-pick dropdown-toggle" id="topic-btn" type="button" title="What we talk about">
+        <Button variant="secondary" size="sm" className="topic-pick" id="topic-btn" type="button" title="What we talk about">
           <TopicIcon />
           <span id="topic-name">{(status.topic || {}).name || "Topic"}</span>
-        </button>
+          <ChevronDownIcon className="size-3.5 opacity-60" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[290px] max-h-[70vh] overflow-auto">
         {started.length > 0 && (

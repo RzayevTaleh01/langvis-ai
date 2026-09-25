@@ -8,6 +8,9 @@ import { useRouter } from "next/navigation";
 import { useLive } from "@/components/live-provider";
 import { getJson } from "@/lib/api";
 import { usePage } from "@/lib/use-page";
+import { CourseCard } from "@/components/course-card";
+import { useCatalog } from "@/components/dialogs";
+import { Button } from "@/components/ui/button";
 
 export default function CoursesPage() {
   usePage("courses");
@@ -15,6 +18,7 @@ export default function CoursesPage() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [failed, setFailed] = useState(false);
+  const catalog = useCatalog();
   const language = ((live.status.modes || []).find((m: any) => m.active) || {}).name;
 
   const load = useCallback(async () => {
@@ -38,20 +42,21 @@ export default function CoursesPage() {
         <h1>Courses</h1>
         <p className="sub">Step-by-step courses for the language you are learning, with a teacher who follows the material.</p>
       </div>
-      <div className="course-cards">
-        {(data?.courses || []).map((c: any) => (
-          <button key={c.key} type="button" disabled={!c.available}
-                  className={"course-card" + (c.current && data.available ? " current" : "")}
-                  onClick={() => {
-                    if (!c.available) return;
-                    live.sendSoon({ type: "track", value: `intensive:${c.key}` });   // only choose it
-                    setTimeout(load, 700);
-                  }}>
-            <strong>{c.name}</strong>
-            <span className="course-card-lvl">{c.levels}</span>
-            <span className="course-card-meta">{c.available ? `${c.lessons} lessons · ${c.weeks} weeks` : "Coming soon"}</span>
-          </button>
-        ))}
+      <div className="cc-grid cc-grid-page">
+        {(data?.courses || []).map((c: any) => {
+          const full = ((catalog && catalog.courses) || []).find((x: any) => x.key === c.key);
+          return (
+            <CourseCard key={c.key} course={{ ...c, ...full, key: c.key }} disabled={!c.available}
+                        current={c.current && data.available}
+                        onClick={() => {
+                          if (!c.available) return;
+                          live.sendSoon({ type: "track", value: `intensive:${c.key}` });   // only choose it
+                          setTimeout(load, 700);
+                        }}
+                        action={<span className="btn-fake">{!c.available ? "Coming soon"
+                          : c.current && data.available ? "Chosen" : "Choose"}</span>} />
+          );
+        })}
       </div>
       {failed && <p className="sub">The course could not be loaded.</p>}
       {data && !data.available && (
@@ -83,8 +88,8 @@ function CourseMap({ data, open }: { data: any; open: (s: { track?: string; less
             <p className="int-step">{`Step ${data.step + 1} of ${data.steps}`}</p>
           </>
         )}
-        <button className="btn primary" type="button" onClick={() => open({ track: "intensive" })}>
-          {going ? "Continue the lesson" : "Start the lesson"}</button>
+        <Button type="button" onClick={() => open({ track: "intensive" })}>
+          {going ? "Continue the lesson" : "Start the lesson"}</Button>
       </section>
       <div className="int-weeks">
         {data.weeks.map((wk: any) => (

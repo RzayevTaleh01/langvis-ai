@@ -199,7 +199,6 @@ body[data-state="SPEAKING"] .speech-who::before { opacity: 1; animation: pulse 1
   border-left: 4px solid var(--pri); animation: pop .3s ease-out;
 }
 .waiting { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.btn.small { padding: 4px 12px; font-size: 13px; }
 
 /* What the learner could say back to the tutor's question. */
 .answers {
@@ -452,8 +451,7 @@ body[data-muted="true"] .state-pill { background: var(--bad-ghost); color: var(-
   padding: 10px 0 12px;
 }
 .control-buttons { display: flex; gap: 10px; align-items: center; }
-.control-buttons .btn { flex: 1; justify-content: center; height: 48px; font-size: 15px; }
-.control-buttons .icon-btn.keyboard { flex: none; width: 48px; height: 48px; }
+.control-buttons > [data-slot=button]:not(#keyboard-btn) { flex: 1; height: 44px; }
 /* The voice bar: your voice as a wave, a flat line when you are quiet. */
 .voicebar {
   min-width: 0; display: flex; align-items: center; gap: 14px; min-width: 0; height: 56px;
@@ -516,7 +514,7 @@ textarea.input { width: 100%; resize: vertical; font: 15px/1.45 var(--ui); }
 /* The message box: one rounded field with the send button inside it. */
 .compose {
   min-width: 0; display: flex; align-items: center; gap: 6px; min-width: 0;
-  padding: 4px 4px 4px 16px; border-radius: 999px;
+  padding: 4px 4px 4px 14px; border-radius: 8px;
   background: var(--panel); border: 1px solid var(--border);
   transition: border-color .15s, box-shadow .15s;
 }
@@ -533,17 +531,6 @@ textarea.input { width: 100%; resize: vertical; font: 15px/1.45 var(--ui); }
 }
 .send:hover { transform: scale(1.06); }
 .send svg { width: 18px; height: 18px; margin-left: 2px; }
-.btn {
-  font-size: 14px; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 8px 14px; border-radius: 999px;
-  border: 1px solid var(--border-strong); background: var(--panel); color: var(--ink-strong);
-}
-.btn:hover { border-color: var(--pri); }
-.btn:disabled { opacity: .6; cursor: default; }
-.btn.primary { background: var(--pri); border-color: var(--pri); color: #fff; padding: 10px 22px; font-size: 16px; }
-.btn.ghost { background: transparent; }
-.btn svg { width: 16px; height: 16px; flex: none; }
 
 /* ── Document pages: dictionary and account ─────────────────────────────── */
 .doc { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 22px 16px 60px; }
@@ -858,7 +845,6 @@ body[data-page="lesson"] .course-side {
 .brand-logo { height: 32px; width: auto; display: block; }
 .doc-head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .head-actions { display: flex; gap: 8px; }
-.head-actions .btn { text-decoration: none; }
 .back-link { display: inline-block; font-size: 13px; color: var(--ink-med); text-decoration: none; margin-bottom: 4px; }
 .back-link:hover { color: var(--pri); }
 #page-grammar .syllabus { margin-top: 12px; }
@@ -881,8 +867,7 @@ body[data-page="lesson"] .course-side {
 .home-hero h1 { margin: 6px 0 0; font: 40px/1.15 var(--serif); color: var(--ink-strong); max-width: 760px; }
 .home-lead { margin: 0; max-width: 680px; font-size: 17px; color: var(--ink-med); }
 .home-cta { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
-.home-cta .btn { text-decoration: none; }
-.home-start { font-size: 17px; padding: 12px 26px; }
+
 .home-facts { list-style: none; padding: 0; margin: 22px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; }
 .home-facts li { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 2px; }
 .home-facts strong { font: 28px/1.1 var(--serif); color: var(--pri); }
@@ -946,9 +931,7 @@ body[data-page="lesson"] .course-side {
 .guest-links { display: flex; gap: 4px; }
 .guest-links a { padding: 6px 12px; border-radius: 8px; color: var(--ink-med); font-weight: 600; font-size: 14px; text-decoration: none; }
 .guest-links a:hover { background: var(--panel-2); color: var(--ink-strong); }
-.guest-bar .btn { text-decoration: none; }
-.guest-bar .btn.primary.small-cta { padding: 8px 18px; font-size: 14px; }
-@media (max-width: 640px) { .guest-links { display: none; } .guest-bar .btn.ghost { padding: 8px 10px; } }
+@media (max-width: 640px) { .guest-links { display: none; } }
 
 .auth-page { flex: 1; display: grid; place-items: center; padding: 40px 16px 64px; }
 .auth-card {
@@ -997,3 +980,29 @@ body[data-page="lesson"] .course-side {
 .seat-card h2 { margin: 0; font: 24px/1.2 var(--serif); color: var(--ink-strong); }
 .seat-card p { margin: 0; color: var(--ink-med); }
 .seat-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+/* ── Home: how LangVis works, in the hero ───────────────────────────────── */
+.home-how { list-style: none; padding: 0; margin: 22px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; text-align: left; }
+.home-how li { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.home-how strong { font: 18px/1.3 var(--serif); color: var(--pri); }
+.home-how span { font-size: 14px; color: var(--ink-med); }
+
+/* ── Course cards (simple, no pictures) ─────────────────────────────────── */
+.cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.cc-grid-page { margin-bottom: 22px; }
+.cc {
+  text-align: left; font: inherit; color: var(--ink); padding: 20px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); transition: border-color .15s;
+}
+.cc:hover { border-color: var(--pri); }
+button.cc { cursor: pointer; }
+button.cc:disabled { cursor: default; opacity: .6; border-color: var(--border); }
+.cc.current { border: 2px solid var(--pri); }
+.cc-head { display: flex; align-items: center; gap: 10px; }
+.cc-lang { font: 24px/1.2 var(--serif); color: var(--ink-strong); }
+.cc-flag { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--pri); }
+.cc-title { margin: 0; font: 600 16px/1.3 var(--ui); color: var(--pri); }
+.cc-learner { margin: 0; font-size: 14px; color: var(--ink-med); flex: 1; }
+.cc-meta { font-size: 13px; color: var(--ink-dim); }
+.cc-foot { margin-top: 6px; }
+@media (max-width: 760px) { .home-how { grid-template-columns: 1fr; } }
