@@ -46,23 +46,32 @@ python main.py
 ```
 
 `setup.py` installs the dependencies. `main.py` starts LangVis and opens
-http://localhost:8765 on the **Courses** page (`python main.py --no-open`
+http://localhost:8765 on the **Home** page (`python main.py --no-open`
 starts only the server).
 
 1. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
    page asks for it.
 2. Open **⚙ Settings**: your own language, the pace and how strictly to correct.
-3. Pick the language in the header (🌐 English or Slovak). Continue your course
-   on **Courses**, or open the **Tutor**, pick a topic and press **Start**.
-   Allow the microphone, and talk.
+3. On **Home**, press **Start learning a new language** and choose English or
+   Slovak - its courses open. Continue your course, or open the **Tutor**, pick
+   a topic and press **Start**. Allow the microphone, and talk.
 
 ---
 
 ## Courses and Tutor
 
-The header holds everything: the logo (home), the **language** you learn (🌐),
-and the pages - **Courses** (the home page), **Tutor** and **Account**. The
-**topic** select appears only on the Tutor page.
+The header holds everything: the logo, the **language** you learn (🌐) and your
+level, and the pages - **Home**, **Courses**, **Tutor** and **Account**. The
+**topic** and the **grammar syllabus** appear only on the Tutor page.
+
+**Home** is the start page: what LangVis is, the two ways to learn, every
+course as tabs (Slovak | English) with its weeks and lessons, and **Start
+learning a new language** - it asks which language, then opens its courses.
+
+![The Home page](docs/screenshots/15-home.png)
+
+![The courses on the Home page](docs/screenshots/16-home-courses.png)
+
 
 ![The header and the language pick](docs/screenshots/01-language.png)
 
@@ -335,9 +344,10 @@ web/
   bridge.py                 the session's messages to every open tab
   static/                   the page (no build step)
     index.html · app.css
-    app.js                  socket, header, pages, chooser, settings
+    app.js                  socket, header, pages, the language choice, settings
+    img/                    the logo and the pictures on the Home page
     board.js                the board and the tutor's walk across it
-    pages.js                Courses, Account, Dictionary and Grammar pages, the course syllabus
+    pages.js                Home, Courses, Account, Dictionary and Grammar pages, the course syllabus
     tutor.js · diagrams.js  the LangVis face and the grammar pictures
     audio.js · mic-worklet.js
 

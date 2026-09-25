@@ -1053,6 +1053,8 @@ LESSONS: list[dict] = [
 COURSE = {
     "id": "english_sentences",
     "language": "english",
+    "about": ("For learners with basic English: make your sentences longer and more natural with "
+              "linking words and phrasal verbs - A2 to B1 in four weeks."),
     "learner": ("The learner already speaks basic English (A2). This course makes their sentences "
                 "longer and more natural: linking words and phrasal verbs."),
     "title": "English · A2 → B1 · Sentence builder",

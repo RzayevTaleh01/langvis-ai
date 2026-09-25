@@ -2281,7 +2281,7 @@ def catalog_for_ui() -> dict:
         weeks = [dict(w, lessons=[l["title"] for l in c["lessons"] if l["week"] == w["week"]])
                  for w in c["weeks"]]
         out.append({"key": key, "name": name, "levels": levels, "title": c["title"],
-                    "learner": c.get("learner", ""), "lessons": len(c["lessons"]),
+                    "learner": c.get("about") or c.get("learner", ""), "lessons": len(c["lessons"]),
                     "weeks": weeks})
     return {"current": _mode_key(), "courses": out}
 
