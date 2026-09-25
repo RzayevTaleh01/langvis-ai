@@ -18,6 +18,12 @@ Socket protocol
 The session is started by the first "start" from a tab, not at launch: the
 browser may only play sound after a click, and a lesson that greets an empty
 room wastes the opening and the API quota.
+
+Accounts (web/auth.py): every endpoint but sign-in and the course catalog
+needs a signed-in account. There is one microphone and one voice session, so
+one account is in use at a time: when another account signs in, the lesson
+stops, the open tabs of the last account are told ("seat_taken") and closed,
+and core/profile.py points every file at the new account's folder.
 """
 from __future__ import annotations
 
@@ -28,16 +34,23 @@ from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
+from core import profile
 from core.live import LiveSession, plugin_fn
 from memory.memory_manager import all_entries_for_ui, forget
 from memory.config_manager import (
-    AVAILABLE_VOICES, get_assistant_name, get_gemini_keys, get_plugin_config, get_user_name,
+    AVAILABLE_VOICES, adopt_legacy_settings, get_assistant_name, get_gemini_keys, get_plugin_config, get_user_name,
     get_voice, is_configured, save_api_keys, save_assistant_config, save_plugin_config,
     save_voice, set_gemini_keys,
 )
+from web.auth import Accounts
 from web.bridge import WebUI
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+# The Next.js page, built as static files (cd frontend && npm run build). When
+# it is there it is the page; the old one in web/static is only a fallback.
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "out"
+# `next dev` runs the page on its own port while it is being worked on.
+DEV_ORIGINS = ("http://localhost:3000", "http://127.0.0.1:3000")
 HOST = "127.0.0.1"
 PORT = 8765
 PUSH_INTERVAL = 0.5     # seconds between checks for changed status / card / syllabus
@@ -49,6 +62,9 @@ class App:
         self.live: LiveSession | None = None
         self._session_task: asyncio.Task | None = None
         self._pushed: dict[str, str] = {}
+        self.accounts = Accounts(self.signed_in, self.signed_out)
+        self.user_id: int | None = None      # the account in use
+        self._seat = asyncio.Lock()
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -63,6 +79,69 @@ class App:
                 loop.run_in_executor(None, fn, who, text)
         self.ui.on_line = keep
         asyncio.get_running_loop().create_task(self._push_loop())
+
+    # ── Accounts: whose lesson this is ───────────────────────────────────────
+
+    async def claim(self, user) -> None:
+        """`user` is using LangVis now. If another account was, its lesson
+        stops and its tabs are closed, and the files switch to this account."""
+        uid = user["id"]
+        if self.user_id == uid:
+            return
+        async with self._seat:
+            if self.user_id == uid:
+                return
+            await self._leave({"type": "seat_taken", "by": user["name"]})
+            await asyncio.to_thread(self._switch_files, uid)
+            self.user_id = uid
+            print(f"[Web] Account in use: {user['email']}")
+
+    async def _leave(self, message: dict) -> None:
+        """The account in use steps away: no lesson, no tab, nothing pushed."""
+        self._stop_session()
+        if self.live:
+            self.live._session_log = []      # its lesson summary is not written for another
+        await self.ui.close_all(message)
+        self._pushed.clear()
+
+    def _switch_files(self, user_id: int | None) -> None:
+        profile.set_user(user_id)
+        fn = plugin_fn("switch_user")
+        if fn is not None:
+            fn()
+        self.ui.reset()
+
+    async def signed_in(self, user, created: bool, first: bool) -> None:
+        if created and first:
+            # The first account takes over what was learned before accounts.
+            copied = await asyncio.to_thread(profile.adopt_legacy_data, user["id"])
+            await asyncio.to_thread(adopt_legacy_settings, user["id"])
+            if copied:
+                print(f"[Web] {user['email']} took over the earlier progress: {', '.join(copied)}")
+        await self.claim(user)
+        if created:
+            await asyncio.to_thread(self._set_up_account, user)
+            self._pushed.clear()
+
+    def _set_up_account(self, user) -> None:
+        """A new account: the tutor calls the learner by name, in the language
+        they chose to learn."""
+        save_assistant_config(get_assistant_name(), user["name"])
+        save_plugin_config("language_tutor", {"mode": user["learning"]})
+        run = plugin_fn("run")
+        if run is not None:
+            run({"action": "set_mode", "mode": user["learning"]})
+        fn = plugin_fn("switch_user")
+        if fn is not None:
+            fn()
+
+    async def signed_out(self, user_id: int) -> None:
+        async with self._seat:
+            if self.user_id != user_id:
+                return
+            await self._leave({"type": "signed_out"})
+            await asyncio.to_thread(self._switch_files, None)
+            self.user_id = None
 
     def _start_session(self) -> None:
         if self._session_task and not self._session_task.done():
@@ -154,12 +233,33 @@ class App:
             self.live.request_reconnect(keep_context=True, reason="a new Gemini key")
         return web.json_response({"ok": True})
 
+    async def courses(self, request: web.Request) -> web.Response:
+        """The course list (/api/catalog) and one course (/api/course?key=).
+        Open without an account too; the learner's own progress only with one."""
+        user = await self.accounts.user_of(request)
+        if user is not None:
+            await self.claim(user)
+        one = request.path == "/api/course"
+        fn = plugin_fn("course_for_ui" if one else "catalog_for_ui")
+        if fn is None:
+            return web.json_response({"error": "not available"}, status=404)
+        try:
+            if one:
+                value = await asyncio.to_thread(fn, request.query.get("key", ""))
+                if user is None and "lessons" in value:
+                    value = dict(value, progress=None, current_language=False,
+                                 lessons=[dict(l, state="locked", open=False) for l in value["lessons"]])
+            else:
+                value = await asyncio.to_thread(fn, user is not None)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+        return _json(value)
+
     async def data(self, request: web.Request) -> web.Response:
         """The account and dictionary pages ask for their data when opened."""
         getter = {"account": "account_for_ui",
                   "dictionary": "dictionary_for_ui",
-                  "intensive": "intensive_for_ui",
-                  "catalog": "catalog_for_ui"}.get(request.match_info["page"])
+                  "intensive": "intensive_for_ui"}.get(request.match_info["page"])
         fn = plugin_fn(getter) if getter else None
         if fn is None:
             return web.json_response({"error": "not available"}, status=404)
@@ -451,25 +551,92 @@ def _same_origin(request: web.Request) -> bool:
     origin = request.headers.get("Origin")
     if origin is None:
         return True        # not a browser page (curl, tests)
-    return origin in (f"http://{request.host}", f"https://{request.host}")
+    return origin in (f"http://{request.host}", f"https://{request.host}") or origin in DEV_ORIGINS
 
 
 @web.middleware
 async def _no_stale_files(request: web.Request, handler):
     """The page is a handful of small local files: always revalidate them, so
-    an update is never half-applied from the browser cache."""
-    response = await handler(request)
-    if request.path.startswith("/static/"):
+    an update is never half-applied from the browser cache. Next.js's own
+    files carry a hash in their name and never change: they are kept."""
+    origin = request.headers.get("Origin")
+    dev = origin in DEV_ORIGINS and request.path.startswith("/api/")
+    if dev and request.method == "OPTIONS":
+        response = web.Response(status=204)
+    else:
+        response = await handler(request)
+    if dev:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    if request.path.startswith("/_next/static/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif not request.path.startswith(("/api/", "/ws")):
         response.headers["Cache-Control"] = "no-cache"
     return response
 
 
+async def _frontend(request: web.Request) -> web.StreamResponse:
+    """A file of the built Next.js page: /courses/ is courses/index.html."""
+    root = FRONTEND_DIR.resolve()
+    rel = request.match_info.get("tail", "").strip("/")
+    target = (root / rel).resolve() if rel else root
+    if root not in target.parents and target != root:
+        raise web.HTTPNotFound()
+    if target.is_dir():
+        target = target / "index.html"
+    elif not target.exists() and target.with_suffix(".html").exists():
+        target = target.with_suffix(".html")
+    elif not target.exists() and target.name.startswith("__next.") and target.suffix == ".txt":
+        # A segment prefetch: "__next.account.grammar.__PAGE__.txt" is stored
+        # as "__next.account/grammar/__PAGE__.txt" - the dots are folders.
+        parts = target.name[len("__next."):-len(".txt")].split(".")
+        if len(parts) > 1:
+            nested = target.parent / ("__next." + parts[0]) / "/".join(parts[1:])
+            nested = nested.with_name(nested.name + ".txt")
+            if root in nested.resolve().parents:
+                target = nested
+    if not target.is_file():
+        missing = root / "404.html"
+        if missing.is_file():
+            return web.FileResponse(missing, status=404)
+        raise web.HTTPNotFound()
+    return web.FileResponse(target)
+
+
+# Open without an account: signing in, and the courses (without progress).
+PUBLIC_API = ("/api/auth/", "/api/catalog", "/api/course")
+
+
+def _require_account(state: App):
+    @web.middleware
+    async def middleware(request: web.Request, handler):
+        path = request.path
+        if path.startswith("/api/auth/") and request.method == "POST" and not _same_origin(request):
+            return web.json_response({"ok": False, "error": "origin"}, status=403)
+        guarded = path == "/ws" or (path.startswith("/api/") and not path.startswith(PUBLIC_API))
+        if guarded and request.method != "OPTIONS":
+            user = await state.accounts.user_of(request)
+            if user is None:
+                return web.json_response({"ok": False, "error": "auth"}, status=401)
+            request["user"] = user
+            await state.claim(user)
+        return await handler(request)
+    return middleware
+
+
 def build_app() -> web.Application:
     state = App()
-    app = web.Application(middlewares=[_no_stale_files])
+    app = web.Application(middlewares=[_no_stale_files, _require_account(state)])
+    app.on_startup.append(state.accounts.open)
     app.on_startup.append(state.on_startup)
-    app.router.add_get("/", state.index)
+    app.on_cleanup.append(state.accounts.close)
     app.router.add_get("/ws", state.socket)
+    app.router.add_get("/api/auth/me", state.accounts.me)
+    app.router.add_post("/api/auth/register", state.accounts.register)
+    app.router.add_post("/api/auth/login", state.accounts.login)
+    app.router.add_post("/api/auth/logout", state.accounts.logout)
     app.router.add_post("/api/key", state.save_key)
     app.router.add_get("/api/settings", state.get_settings)
     app.router.add_post("/api/settings", state.put_settings)
@@ -478,15 +645,22 @@ def build_app() -> web.Application:
     app.router.add_post("/api/keys", state.post_keys)
     app.router.add_get("/api/history", state.get_history)
     app.router.add_post("/api/memory/forget", state.forget_memory)
+    app.router.add_get("/api/catalog", state.courses)
+    app.router.add_get("/api/course", state.courses)
     app.router.add_get("/api/{page}", state.data)
-    app.router.add_static("/static/", STATIC_DIR)
+    if FRONTEND_DIR.is_dir():
+        app.router.add_get("/{tail:.*}", _frontend)
+    else:
+        app.router.add_get("/", state.index)
+        app.router.add_static("/static/", STATIC_DIR)
     app["state"] = state
     return app
 
 
-def main(open_browser: bool = True) -> None:
-    url = f"http://localhost:{PORT}/"
+def main(open_browser: bool = True, port: int | None = None) -> None:
+    port = port or PORT
+    url = f"http://localhost:{port}/"
     print(f"⚙  LangVis - {url}")
     if open_browser:
         webbrowser.open(url)
-    web.run_app(build_app(), host=HOST, port=PORT, print=None)
+    web.run_app(build_app(), host=HOST, port=port, print=None)

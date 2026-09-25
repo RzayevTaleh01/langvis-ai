@@ -171,7 +171,7 @@ def _native() -> str:
 
 
 def _paths(lang: dict) -> tuple[Path, Path]:
-    d = pg.data_dir(BASE, lang)
+    d = _data_dir(lang)
     return d / "level.json", d / "progress.md"
 
 
@@ -330,7 +330,9 @@ def _ensure_topic(state: dict) -> bool:
 
 
 def _data_dir(lang: dict) -> Path:
-    return pg.data_dir(BASE, lang)
+    """The language's folder of the signed-in account (core/profile.py)."""
+    from core import profile
+    return pg.data_dir(profile.user_dir(), lang)
 
 
 def _lexicon(lang: dict, topic: dict) -> dict | None:
@@ -973,6 +975,23 @@ def reset_lesson() -> None:
         _coaching.clear()
         _coaching["stamp"] = time.time()
         _coaching["reset"] = True
+
+
+def switch_user() -> None:
+    """Another account is signed in (core/profile.py already points at its
+    folder): nothing of the last learner may reach the new one - not a turn in
+    progress, not a sentence still waiting to be analysed, not a cached status."""
+    while True:
+        try:
+            _queue.get_nowait()
+        except queue.Empty:
+            break
+    reset_lesson()
+    _last_record.clear()
+    _lexicon_failed.clear()
+    _starter_failed.clear()
+    _status_cache.update(key=None, value={})
+    _syllabus_cache.update(key=None, value=[])
 
 
 REPEAT_OK = 0.75        # share of the words that must match for a good repeat
@@ -2271,19 +2290,64 @@ def end_silence() -> float:
     return {"A1": 1.9, "A2": 1.6, "B1": 1.3}.get(level, 1.1)
 
 
-def catalog_for_ui() -> dict:
-    """Every course of every language, for the Home page: its weeks and lesson titles."""
+def _course_card(key: str, name: str, levels: str, c: dict) -> dict:
+    """What a course list shows of one course."""
+    weeks = [dict(w, lessons=[l["title"] for l in c["lessons"] if l["week"] == w["week"]])
+             for w in c["weeks"]]
+    return {"key": key, "name": name, "levels": levels, "title": c["title"],
+            "learner": c.get("about") or c.get("learner", ""), "lessons": len(c["lessons"]),
+            "words": sum(len(l.get("words") or []) + len(l.get("phrases") or []) for l in c["lessons"]),
+            "weeks": weeks}
+
+
+def _course_progress(key: str, c: dict) -> dict:
+    """How far the signed-in learner is in a course (of any language)."""
+    prog = _intensive_load(cur.language(key))
+    idx = max(0, min(int(prog.get("lesson", 0)), len(c["lessons"]) - 1))
+    done = [l for l in c["lessons"] if l["id"] in prog["done"]]
+    return {"done": len(done), "total": len(c["lessons"]), "current": idx,
+            "current_title": c["lessons"][idx]["title"], "step": int(prog.get("step", 0)),
+            "started": bool(done) or idx > 0 or int(prog.get("step", 0)) > 0}
+
+
+def catalog_for_ui(progress: bool = False) -> dict:
+    """Every course of every language, for Home and the course list: its weeks
+    and lesson titles - and, for a signed-in learner, how far they are."""
     out = []
     for key, name, levels in COURSE_CATALOG:
         c = INTENSIVE_COURSES.get(key)
         if not c:
             continue
-        weeks = [dict(w, lessons=[l["title"] for l in c["lessons"] if l["week"] == w["week"]])
-                 for w in c["weeks"]]
-        out.append({"key": key, "name": name, "levels": levels, "title": c["title"],
-                    "learner": c.get("about") or c.get("learner", ""), "lessons": len(c["lessons"]),
-                    "weeks": weeks})
-    return {"current": _mode_key(), "courses": out}
+        card = _course_card(key, name, levels, c)
+        if progress:
+            card["progress"] = _course_progress(key, c)
+        out.append(card)
+    return {"current": _mode_key() if progress else "", "courses": out}
+
+
+def course_for_ui(key: str) -> dict:
+    """One course in full, for its own page: every lesson with its goal and
+    words, and the learner's place in it."""
+    for k, name, levels in COURSE_CATALOG:
+        c = INTENSIVE_COURSES.get(k)
+        if k != key or not c:
+            continue
+        card = _course_card(k, name, levels, c)
+        prog = _course_progress(k, c)
+        done_ids = set(_intensive_load(cur.language(k))["done"])
+        lessons = []
+        for n, l in enumerate(c["lessons"]):
+            state = ("done" if l["id"] in done_ids else
+                     "current" if n == prog["current"] else "locked")
+            lessons.append({"index": n, "week": int(l["week"]), "day": int(l["day"]), "band": l["band"],
+                            "title": l["title"], "goal": l["goal"], "state": state,
+                            "open": n <= prog["done"],
+                            "grammar": (l.get("grammar") or {}).get("name", ""),
+                            "words": [w["text"] for w in l.get("words") or []],
+                            "speak": l.get("speak", "")})
+        return dict(card, progress=prog, lessons=lessons, current_language=_mode_key() == k,
+                    language=cur.language(k)["name"])
+    return {"error": "no such course"}
 
 
 def intensive_for_ui() -> dict:

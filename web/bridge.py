@@ -55,6 +55,19 @@ class WebUI:
         with self._clients_lock:
             self._clients.discard(ws)
 
+    async def close_all(self, message: dict) -> None:
+        """Every open tab is told why, and disconnected: another account is
+        signed in on this computer, or this one signed out."""
+        with self._clients_lock:
+            clients = list(self._clients)
+            self._clients.clear()
+        for ws in clients:
+            try:
+                await ws.send_str(json.dumps(message, ensure_ascii=False))
+                await ws.close()
+            except Exception:
+                pass
+
     def has_clients(self) -> bool:
         with self._clients_lock:
             return bool(self._clients)

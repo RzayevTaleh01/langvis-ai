@@ -3,6 +3,7 @@
 config/api_keys.json
 .env
 .env.*
+!.env.example
 
 # ── Personal data ─────────────────────────────────────────────────────────────
 # what the tutor remembers about you
@@ -11,6 +12,8 @@ memory/*.db
 # your own speech, transcribed, scored and tracked - local only
 english/
 slovak/
+# every account's own progress, settings and memory
+users/
 
 # ── Python build noise ────────────────────────────────────────────────────────
 __pycache__/

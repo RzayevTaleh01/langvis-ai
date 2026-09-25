@@ -5,6 +5,8 @@ from threading import Lock
 from pathlib import Path
 import sys
 
+from core import profile
+
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -13,7 +15,6 @@ def get_base_dir() -> Path:
 
 
 BASE_DIR         = get_base_dir()
-MEMORY_PATH      = BASE_DIR / "memory" / "long_term.json"
 _lock            = Lock()
 MAX_VALUE_LENGTH = 380
 
@@ -55,11 +56,11 @@ def _empty_memory() -> dict:
     }
 
 def load_memory() -> dict:
-    if not MEMORY_PATH.exists():
+    if not profile.memory_path().exists():
         return _empty_memory()
     with _lock:
         try:
-            data = json.loads(MEMORY_PATH.read_text(encoding="utf-8"))
+            data = json.loads(profile.memory_path().read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 base = _empty_memory()
                 for key in base:
@@ -119,9 +120,9 @@ def save_memory(memory: dict) -> None:
     if not isinstance(memory, dict):
         return
     memory = _trim_to_limit(memory)
-    MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    profile.memory_path().parent.mkdir(parents=True, exist_ok=True)
     with _lock:
-        MEMORY_PATH.write_text(
+        profile.memory_path().write_text(
             json.dumps(memory, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
@@ -450,8 +451,8 @@ def save_session_summary(summary: str, language: str = "") -> None:
     sessions.append(entry)
     memory["sessions"] = sessions[-_SESSION_MAX:]
     with _lock:
-        MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MEMORY_PATH.write_text(
+        profile.memory_path().parent.mkdir(parents=True, exist_ok=True)
+        profile.memory_path().write_text(
             json.dumps(memory, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
@@ -468,10 +469,10 @@ def pop_last_session(language: str = "") -> dict | None:
     deleting was discarding the archive in order to solve it.
     """
     with _lock:
-        if not MEMORY_PATH.exists():
+        if not profile.memory_path().exists():
             return None
         try:
-            memory   = json.loads(MEMORY_PATH.read_text(encoding="utf-8"))
+            memory   = json.loads(profile.memory_path().read_text(encoding="utf-8"))
             sessions = memory.get("sessions", [])
             if not isinstance(sessions, list) or not sessions:
                 return None
@@ -481,7 +482,7 @@ def pop_last_session(language: str = "") -> dict | None:
             if entry is None:
                 return None
             entry["mentioned"] = True
-            MEMORY_PATH.write_text(
+            profile.memory_path().write_text(
                 json.dumps(memory, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )

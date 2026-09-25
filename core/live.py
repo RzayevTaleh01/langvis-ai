@@ -34,6 +34,7 @@ from google import genai
 from google.genai import types
 
 from core.plugin_loader import discover_plugins
+from core import profile
 from memory.config_manager import get_voice
 from memory.memory_manager import (
     format_memory_for_prompt, load_memory, pop_last_session, save_session_summary,
@@ -709,9 +710,10 @@ class LiveSession:
 
     def _build_config(self) -> types.LiveConnectConfig:
         try:
-            _cfg = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
-            self._asst_name = (_cfg.get("assistant_name") or "LangVis").strip()
-            _user_name = (_cfg.get("user_name") or "").strip()
+            # The signed-in account's names (memory/config_manager.py).
+            from memory.config_manager import get_assistant_name, get_user_name
+            self._asst_name = get_assistant_name().strip() or "LangVis"
+            _user_name = get_user_name().strip()
         except Exception:
             self._asst_name = "LangVis"
             _user_name = ""
@@ -996,8 +998,10 @@ class LiveSession:
             turns={"role": "user", "parts": [{"text": prompt}]}, turn_complete=True)
         self.ui.write_log("SYS: Lesson started.")
 
-    async def _save_session_summary(self) -> None:
-        """One or two sentences about this lesson, for the next one to open on."""
+    async def _save_session_summary(self, owner: int | None) -> None:
+        """One or two sentences about this lesson, for the next one to open on.
+        `owner` is the account the lesson belonged to: if another account has
+        signed in meanwhile, the summary is not written into its memory."""
         log = self._session_log
         if len(log) < 3:
             return
@@ -1010,7 +1014,7 @@ class LiveSession:
             resp = await asyncio.to_thread(client.models.generate_content,
                                            model="gemini-flash-lite-latest", contents=prompt)
             summary = (getattr(resp, "text", "") or "").strip()
-            if summary:
+            if summary and profile.current() == owner:
                 save_session_summary(summary[:280], _plugin_value("language_name", "English"))
         except Exception as e:
             print(f"[Memory] ⚠️ Lesson summary failed: {e}")
@@ -1036,6 +1040,7 @@ class LiveSession:
         self._reconnect_event = asyncio.Event()
         self._stopping = False
         set_trim_notifier(self.ui.write_log)
+        owner = profile.current()
 
         while True:
             resumed = self._resume_handle is not None
@@ -1125,7 +1130,7 @@ class LiveSession:
             finally:
                 self.session = None
                 if len(self._session_log) >= 3:
-                    asyncio.create_task(self._save_session_summary())
+                    asyncio.create_task(self._save_session_summary(owner))
 
             self.set_speaking(False)
             self.ui.set_state("SLEEPING")

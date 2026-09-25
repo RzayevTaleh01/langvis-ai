@@ -38,6 +38,10 @@ and ask about any grammar or word.
 ## Quick start
 
 ```bash
+docker compose up -d
+```
+
+```bash
 python setup.py
 ```
 
@@ -45,14 +49,21 @@ python setup.py
 python main.py
 ```
 
+`docker compose up -d` starts the accounts database (PostgreSQL, port 5433,
+only reachable from this computer). The defaults work as they are; copy
+`.env.example` to `.env` to change them.
+
 `setup.py` installs the dependencies. `main.py` starts LangVis and opens
 http://localhost:8765 on the **Home** page (`python main.py --no-open`
 starts only the server).
 
-1. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
+1. **Sign up** (top right) with your name, email and a password, and choose
+   the language to learn. Every account has its own level, course, words,
+   history, memory and settings; the tutor calls you by your name.
+2. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
    page asks for it.
-2. Open **⚙ Settings**: your own language, the pace and how strictly to correct.
-3. On **Home**, press **Start learning a new language** and choose English or
+3. Open **Settings** from your name at the top right: your own language, the pace and how strictly to correct.
+4. On **Home**, press **Start learning a new language** and choose English or
    Slovak - its courses open. Continue your course, or open the **Tutor**, pick
    a topic and press **Start**. Allow the microphone, and talk.
 
@@ -321,7 +332,17 @@ on the board and in the dictionary. Progress is kept separately per language.
 
 ## What is saved
 
-Everything stays on your computer, per language (`english/`, `slovak/`):
+Everything stays on your computer. The accounts (name, email, a scrypt hash of
+the password, sessions) are in the PostgreSQL database of
+`docker-compose.yml`. Everything an account learns is in its own folder,
+`users/u<id>/`, per language (`english/`, `slovak/`), with its `memory/` and
+`settings.json`. The Gemini keys in `config/api_keys.json` are shared by all
+accounts.
+
+There is one microphone and one voice lesson, so one account uses LangVis at a
+time: when another account signs in, the first one's lesson stops (its
+progress is kept) and its tabs say so. The very first account takes over the
+progress made before accounts existed (copied, the old folders stay).
 
 | File | What it holds |
 |---|---|

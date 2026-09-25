@@ -1,0 +1,24 @@
+# The accounts database. Start it with:  docker compose up -d
+# The server connects to it through DATABASE_URL (see .env.example).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: langvis-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-langvis}
+      POSTGRES_USER: ${POSTGRES_USER:-langvis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-langvis}
+    ports:
+      # Only this computer can reach it. 5433, so a local Postgres on 5432 is not in the way.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - langvis-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-langvis} -d ${POSTGRES_DB:-langvis}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  langvis-db:

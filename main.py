@@ -3,6 +3,7 @@ main.py - start LangVis.
 
     python main.py            starts the local server and opens http://localhost:8765/
     python main.py --no-open  starts the server only
+    python main.py --port 8766  on another port
 """
 import sys
 
@@ -28,4 +29,5 @@ except Exception as _e:                                  # pragma: no cover
 from web.server import main as serve  # noqa: E402  (after the console is set up)
 
 if __name__ == "__main__":
-    serve(open_browser="--no-open" not in sys.argv)
+    port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else None
+    serve(open_browser="--no-open" not in sys.argv, port=port)

@@ -2,3 +2,4 @@
 numpy
 google-genai>=2.8.0
 aiohttp>=3.9
+asyncpg>=0.29
