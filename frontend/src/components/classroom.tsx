@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import { Board } from "@/legacy/board.js";
 import { TutorFace, TutorWalker } from "@/legacy/tutor.js";
 import { useLive } from "@/components/live-provider";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   KeyboardIcon, MicOffIcon, MicOnIcon, PlayIcon, RestartIcon, SendIcon, SkipIcon, StopIcon,
 } from "@/components/icons";

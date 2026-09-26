@@ -692,7 +692,6 @@ body[data-page="lesson"] .course-side {
 .brand-logo { height: 32px; width: auto; display: block; }
 .doc-head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .head-actions { display: flex; gap: 8px; }
-.head-actions .btn { text-decoration: none; }
 .back-link { display: inline-block; font-size: 13px; color: var(--ink-med); text-decoration: none; margin-bottom: 4px; }
 .back-link:hover { color: var(--pri); }
 #page-grammar .syllabus { margin-top: 12px; }
@@ -813,3 +812,29 @@ body[data-page="lesson"] .course-side {
 .seat-card h2 { margin: 0; font: 24px/1.2 var(--serif); color: var(--ink-strong); }
 .seat-card p { margin: 0; color: var(--ink-med); }
 .seat-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+/* ── Home: how LangVis works, in the hero ───────────────────────────────── */
+.home-how { list-style: none; padding: 0; margin: 22px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; text-align: left; }
+.home-how li { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.home-how strong { font: 18px/1.3 var(--serif); color: var(--pri); }
+.home-how span { font-size: 14px; color: var(--ink-med); }
+
+/* ── Course cards (simple, no pictures) ─────────────────────────────────── */
+.cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.cc-grid-page { margin-bottom: 22px; }
+.cc {
+  text-align: left; font: inherit; color: var(--ink); padding: 20px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); transition: border-color .15s;
+}
+.cc:hover { border-color: var(--pri); }
+button.cc { cursor: pointer; }
+button.cc:disabled { cursor: default; opacity: .6; border-color: var(--border); }
+.cc.current { border: 2px solid var(--pri); }
+.cc-head { display: flex; align-items: center; gap: 10px; }
+.cc-lang { font: 24px/1.2 var(--serif); color: var(--ink-strong); }
+.cc-flag { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--pri); }
+.cc-title { margin: 0; font: 600 16px/1.3 var(--ui); color: var(--pri); }
+.cc-learner { margin: 0; font-size: 14px; color: var(--ink-med); flex: 1; }
+.cc-meta { font-size: 13px; color: var(--ink-dim); }
+.cc-foot { margin-top: 6px; }
+@media (max-width: 760px) { .home-how { grid-template-columns: 1fr; } }

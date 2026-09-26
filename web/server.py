@@ -368,8 +368,9 @@ class App:
         run = plugin_fn("run")
         if run is None:
             return
-        for key, action in (("starting_level", "set_level"), ("goal_level", "set_goal"),
-                            ("mode", "set_mode")):
+        # The language first: the starting level then belongs to the new one.
+        for key, action in (("mode", "set_mode"), ("starting_level", "set_level"),
+                            ("goal_level", "set_goal")):
             if values.get(key) and values.get(key) != before.get(key):
                 field = "mode" if key == "mode" else "level"
                 run({"action": action, field: values[key]})

@@ -82,7 +82,7 @@ def _empty_state() -> dict:
     return {
         "version": 2,
         "created": _now_iso(),
-        "declared_level": "A2",
+        "declared_level": "A1",
         "goal_level": "B2",
         "paused": False,
         "totals": {"utterances": 0, "target_utterances": 0, "native_utterances": 0,
@@ -192,7 +192,7 @@ def effective_level(state: dict) -> tuple[str, float, bool]:
     """(band, score, measured?) - the stated level is a prior worth
     PRIOR_WEIGHT sentences that fades as real evidence accumulates."""
     scoring = scoring_samples(state)
-    declared = state.get("declared_level") or "A2"
+    declared = state.get("declared_level") or "A1"
     prior = _BAND_MIDPOINT.get(declared, 28.0)
     n = len(scoring)
     if not n:

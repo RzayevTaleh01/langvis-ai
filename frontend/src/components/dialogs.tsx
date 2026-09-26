@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TrashIcon } from "@/components/icons";
 import { useLive } from "@/components/live-provider";
 import { getJson, postJson } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 type OpenProps = { open: boolean; onOpenChange: (open: boolean) => void };
 

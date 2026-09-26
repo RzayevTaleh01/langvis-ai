@@ -13,6 +13,9 @@ import { Button } from "@/components/ui/button";
 import { useLive } from "@/components/live-provider";
 import { getJson } from "@/lib/api";
 import { usePage } from "@/lib/use-page";
+import { CourseCard } from "@/components/course-card";
+import { useCatalog } from "@/components/dialogs";
+import { Button } from "@/components/ui/button";
 
 export default function CoursesPage() {
   usePage("courses");
@@ -20,6 +23,7 @@ export default function CoursesPage() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [failed, setFailed] = useState(false);
+  const catalog = useCatalog();
   const language = ((live.status.modes || []).find((m: any) => m.active) || {}).name;
 
   const load = useCallback(async () => {

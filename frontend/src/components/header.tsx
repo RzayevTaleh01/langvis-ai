@@ -16,6 +16,7 @@ import { BookIcon, ChatIcon, GearIcon, GlobeIcon, GrammarIcon, HomeIcon, TopicIc
 import { useLive } from "@/components/live-provider";
 import { firstName, useAuth } from "@/components/auth-provider";
 import { CustomTopicDialog, SettingsDialog, UnitsDialog } from "@/components/dialogs";
+import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/", page: "home", label: "Home", Icon: HomeIcon },
@@ -62,7 +63,7 @@ export function Header() {
       </Select>
 
       <div className="chip" id="chip-level" title="Your measured level">
-        {status.level ? <><strong>{status.level}</strong>{` · ${status.score}/100 → ${status.goal}`}</> : "-"}
+        {status.level ? <><strong>{status.level}</strong>{` → ${status.goal}`}</> : "-"}
       </div>
 
       <div className="spacer" />

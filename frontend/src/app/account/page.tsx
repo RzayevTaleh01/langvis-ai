@@ -14,6 +14,7 @@ import { getJson } from "@/lib/api";
 import { barChart, fmtDate, hideTip, lineChart, showTip } from "@/lib/charts";
 import { usePage } from "@/lib/use-page";
 import { Stat } from "@/components/stat";
+import { Button } from "@/components/ui/button";
 
 export default function AccountPage() {
   usePage("account");
@@ -62,7 +63,7 @@ export default function AccountPage() {
         <div>
           <h1>Account</h1>
           <p className="sub">{failed ? "The account could not be loaded."
-            : res ? `Level ${res.level} · ${Math.round(res.score)}/100 · goal ${res.goal}` + (res.measured ? "" : " · still mostly your own estimate") : ""}</p>
+            : res ? `Level ${res.level} → goal ${res.goal}` : ""}</p>
         </div>
         <div className="head-actions">
           <Button asChild variant="outline"><Link href="/account/dictionary/">Dictionary</Link></Button>

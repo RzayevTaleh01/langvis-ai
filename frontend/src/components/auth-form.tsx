@@ -8,10 +8,9 @@ import { postJson } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const LANGUAGES = [
-  { name: "English", note: "A2 → B1 · explained simply" },
-  { name: "Slovak", note: "A1 → B1 · from zero" },
-];
+// The language to learn comes from the course card ("Learn Slovak" opens
+// /register/?learn=Slovak); it can be changed later from the header.
+const LANGUAGES = ["English", "Slovak"];
 
 // Only a page of this site: never an address from outside.
 function nextPage(): string {
@@ -25,9 +24,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Only ever rendered in the browser (the shell waits for the account first).
-  const [learning, setLearning] = useState(() => {
+  const [learning] = useState(() => {
     const learn = new URLSearchParams(window.location.search).get("learn");
-    return LANGUAGES.some((l) => l.name === learn) ? (learn as string) : "English";
+    return learn && LANGUAGES.includes(learn) ? learn : "English";
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);

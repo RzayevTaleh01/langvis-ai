@@ -11,6 +11,7 @@ import { LiveProvider, useLive } from "@/components/live-provider";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { ContentDialog, KeyDialog } from "@/components/dialogs";
+import { Button } from "@/components/ui/button";
 
 const GUEST_PAGES = ["/", "/login/", "/register/"];
 const AUTH_PAGES = ["/login/", "/register/"];
