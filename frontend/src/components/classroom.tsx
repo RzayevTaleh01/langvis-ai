@@ -16,7 +16,6 @@ import {
 } from "@/components/icons";
 import { CourseSide } from "@/components/course-side";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
   const live = useLive();
@@ -56,7 +55,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
               <p id="start-what">{kind === "tutor"
                 ? "Free conversation: talk about anything, ask about any grammar or word. Press Start and your tutor begins."
                 : "Your course lesson, step by step. Press Start and the teacher begins."}</p>
-              <Button size="lg" className="start-btn" id="start-btn" onClick={() => live.begin()}>
+              <Button size="lg" className="start-btn" id="start-btn" type="button" onClick={() => live.begin()}>
                 <PlayIcon />
                 Start</Button>
             </div>
@@ -69,7 +68,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
             </span>
             <span className="spacer" />
             <span className="state-pill" id="tutor-state">{pill}</span>
-            <Button variant="ghost" size="icon-sm" id="restart" title="Start the lesson again"
+            <Button variant="ghost" size="icon-sm" id="restart" type="button" title="Start the lesson again"
                     aria-label="Start the lesson again"
                     onClick={() => {
                       if (!live.started) return;
@@ -87,7 +86,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
         </div>
         <div className="waiting hidden" id="waiting">
           <div><span className="waiting-label">Your turn - say:</span> <span id="waiting-text" /></div>
-          <Button variant="outline" size="sm" id="skip" title="Go on without repeating"
+          <Button variant="ghost" size="sm" id="skip" type="button" title="Go on without repeating"
                   onClick={() => live.send({ type: "skip" })}>
             <SkipIcon />
             Skip</Button>
@@ -99,7 +98,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
         </div>
 
         <div className="block" id="said-block">
-          <div className="label">You said <Button variant="link" size="xs" id="undo" hidden>I didn&apos;t say that</Button></div>
+          <div className="label">You said <Button variant="link" size="sm" id="undo" type="button" hidden>I didn&apos;t say that</Button></div>
           <p className="sentence" id="said"><span className="hint">Speak - your sentence is written here.</span></p>
         </div>
 
@@ -194,13 +193,13 @@ function SidePanel() {
 
   return (
     <aside className="side">
-      <div className="tabs" role="tablist">
-        <Button variant={tab === "words" ? "soft" : "ghost"} size="sm" className="flex-1" role="tab"
-                aria-selected={tab === "words"} onClick={() => setTab("words")}>
-          {deck.intensive ? "Lesson words" : "Topic words"}</Button>
-        <Button variant={tab === "transcript" ? "soft" : "ghost"} size="sm" className="flex-1" role="tab"
-                aria-selected={tab === "transcript"} onClick={() => setTab("transcript")}>Transcript</Button>
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="gap-0">
+        <TabsList variant="line" className="gap-0">
+          <TabsTrigger value="words" className="flex-1 px-2.5! text-[13px]!">
+            {deck.intensive ? "Lesson words" : "Topic words"}</TabsTrigger>
+          <TabsTrigger value="transcript" className="flex-1 px-2.5! text-[13px]!">Transcript</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <div className={"pane" + (tab === "words" ? "" : " hidden")} id="pane-words">
         <div className="pane-head" id="words-head">{head}</div>
         <ul className="words" id="words">
@@ -323,12 +322,12 @@ function Controls() {
   return (
     <footer className="controls">
       <div className={"voicebar" + (typing ? " hidden" : "")} id="voicebar">
-        <Button size="icon-lg" className="mic-toggle" id="mic" aria-pressed={!live.muted} aria-label="Microphone"
+        <button className="mic-toggle" id="mic" type="button" aria-pressed={!live.muted} aria-label="Microphone"
                 title={live.muted ? "Microphone off - click to turn it on (F4)" : "Microphone on - click to turn it off (F4)"}
                 onClick={() => live.send({ type: "mute", value: !live.muted })}>
           <MicOnIcon />
           <MicOffIcon />
-        </Button>
+        </button>
         <canvas id="wave" aria-hidden="true" ref={wave} />
         <span className="voice-hint" id="voice-hint" ref={hint}>Just talk - I&apos;m listening</span>
       </div>
@@ -339,16 +338,16 @@ function Controls() {
               live.send({ type: "text", text: text.trim() });
               setText("");
             }}>
-        <Input ref={inputRef} id="text" type="text" autoComplete="off" placeholder="Type a sentence and press Enter…"
-               className="h-11" aria-label="Type a sentence" value={text} onChange={(e) => setText(e.target.value)} />
-        <Button type="submit" size="icon-lg" title="Send" aria-label="Send"><SendIcon /></Button>
+        <Input ref={inputRef} id="text" type="text" autoComplete="off" className="h-9 border-0 bg-transparent px-0 focus-visible:ring-0" placeholder="Type a sentence and press Enter…"
+               aria-label="Type a sentence" value={text} onChange={(e) => setText(e.target.value)} />
+        <Button size="icon" type="submit" title="Send" aria-label="Send"><SendIcon /></Button>
       </form>
       <div className="control-buttons">
-        <Button variant={typing ? "default" : "outline"} size="icon-lg" id="keyboard-btn" aria-pressed={typing}
+        <Button variant={typing ? "default" : "outline"} size="icon" id="keyboard-btn" type="button" className="size-11"
                 title="Type a message instead" aria-label="Type a message" onClick={() => setTyping((t) => !t)}>
           <KeyboardIcon />
         </Button>
-        <Button variant="outline" size="lg" className="flex-1" id="interrupt"
+        <Button variant="ghost" id="interrupt" type="button"
                 onClick={() => { live.audio.flush(); live.send({ type: "interrupt" }); }}>
           <StopIcon />
           Interrupt</Button>

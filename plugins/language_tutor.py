@@ -2361,7 +2361,7 @@ def intensive_for_ui() -> dict:
             parts[-1]["count"] += 1
         lessons.append({"index": n, "id": l["id"], "week": l["week"], "day": l["day"],
                         "band": l["band"], "title": l["title"], "goal": l["goal"], "state": state,
-                        "open": n <= len(prog["done"]), "words": [w["text"] for w in l["words"]],
+                        "open": _lesson_open(n, prog, idx), "words": [w["text"] for w in l["words"]],
                         "phrases": [p["text"] for p in l.get("phrases") or []],
                         "grammar": (l.get("grammar") or {}).get("name", ""),
                         "speak": l.get("speak", ""), "parts": parts,

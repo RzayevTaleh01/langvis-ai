@@ -1,37 +1,5 @@
-/* LangVis on shadcn: the few layout rules around the shared components
-   (Button, Input, Select), and the course page. The components themselves
-   carry their look (src/components/ui). */
-
-/* ── Header ─────────────────────────────────────────────────────────────── */
-.nav { display: flex; gap: 2px; }
-.nav [data-slot="button"] { font-weight: 600; }
-.header-pick { max-width: 280px; font-weight: 600; }
-.lang-select { font-weight: 600; }
-.user-btn { gap: 8px; font-weight: 600; color: var(--ink-strong); }
-.guest-links { display: flex; gap: 4px; }
-.guest-links a { padding: 6px 12px; border-radius: 6px; color: var(--ink-med); font-weight: 600; font-size: 14px; text-decoration: none; }
-.guest-links a:hover { background: var(--panel-2); color: var(--ink-strong); }
-@media (max-width: 640px) { .guest-links { display: none; } }
-@media (max-width: 560px) { .nav [data-slot="button"] span { display: none; } }
-
-/* ── Choice buttons: a language to learn ────────────────────────────────── */
-.choice-btn {
-  height: auto; flex-direction: column; align-items: flex-start; justify-content: flex-start;
-  gap: 2px; padding: 12px 14px; text-align: left; white-space: normal;
-}
-.choice-btn strong { font: 20px/1.2 var(--serif); color: var(--ink-strong); }
-.choice-btn span { font-size: 14px; color: var(--pri); font-weight: 600; }
-.choice-btn .choice-note { font-weight: 400; color: var(--ink-med); font-size: 13px; }
-.lang-options .choice-btn { padding: 18px; }
-
-/* ── Board page ─────────────────────────────────────────────────────────── */
-.tabs { display: flex; gap: 4px; padding: 6px; border-bottom: 1px solid var(--border); }
-.control-buttons { display: flex; gap: 10px; align-items: center; }
-.start-btn { margin-top: 6px; }
-.mic-toggle { position: relative; flex: none; }
-.mic-toggle .mic-off { display: none; }
-.key-add { align-items: center; }
-.memory-list .key-actions { display: flex; gap: 4px; align-items: center; }
+/* The course page (src/app/courses/page.tsx): a course laid out like a course
+   page - hero, what you'll learn, the syllabus by week, and a card to continue. */
 
 /* ── Course page ────────────────────────────────────────────────────────── */
 .course-page { flex: 1; overflow: auto; }

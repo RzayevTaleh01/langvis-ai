@@ -14,7 +14,6 @@ import { getJson } from "@/lib/api";
 import { barChart, fmtDate, hideTip, lineChart, showTip } from "@/lib/charts";
 import { usePage } from "@/lib/use-page";
 import { Stat } from "@/components/stat";
-import { Button } from "@/components/ui/button";
 
 export default function AccountPage() {
   usePage("account");

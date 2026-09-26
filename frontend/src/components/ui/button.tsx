@@ -14,10 +14,9 @@ const buttonVariants = cva(
         speak: "bg-[var(--speak)] text-white hover:bg-[#b04e24] hover:text-white",
         outline:
           "border-border bg-card text-foreground hover:border-primary hover:text-primary aria-expanded:border-primary aria-expanded:text-primary",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[#e8e0d0] aria-expanded:bg-[#e8e0d0]",
+        secondary: "bg-accent text-accent-foreground hover:bg-[#d3e7e2] aria-expanded:bg-[#d3e7e2]",
         ghost:
-          "text-[var(--ink-med)] hover:bg-secondary hover:text-foreground aria-expanded:bg-secondary aria-expanded:text-foreground",
+          "text-[var(--ink-strong)] hover:bg-secondary aria-expanded:bg-secondary",
         soft: "bg-accent text-accent-foreground hover:bg-[#d3e7e2]",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20",

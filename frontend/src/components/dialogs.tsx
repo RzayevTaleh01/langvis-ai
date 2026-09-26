@@ -7,7 +7,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -127,8 +126,9 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
                   </div>
                   {!k.main && (
                     <div className="key-actions">
-                      <Button variant="ghost" size="xs" onClick={() => keyAction({ action: "main", id: k.id })}>Make main</Button>
-                      <Button variant="ghost" size="icon-sm" className="hover:text-destructive" title="Remove this key" aria-label={`Remove key ${k.masked}`}
+                      <Button variant="link" size="sm" type="button" onClick={() => keyAction({ action: "main", id: k.id })}>make main</Button>
+                      <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
+                              title="Remove this key" aria-label={`Remove key ${k.masked}`}
                               onClick={() => keyAction({ action: "remove", id: k.id })}><TrashIcon /></Button>
                     </div>
                   )}
@@ -143,9 +143,9 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
                        e.preventDefault();
                        if (keyNew.trim()) keyAction({ action: "add", key: keyNew.trim(), main: false });
                      }} />
-              <Button variant="outline"
+              <Button variant="outline" type="button"
                       onClick={() => keyNew.trim() && keyAction({ action: "add", key: keyNew.trim(), main: false })}>Add as extra</Button>
-              <Button variant="outline"
+              <Button variant="outline" type="button"
                       onClick={() => keyNew.trim() && keyAction({ action: "add", key: keyNew.trim(), main: true })}>Set as main</Button>
             </div>
             <p className="note">{keysNote}</p>
@@ -165,7 +165,8 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
                     <div className="mem-key">{`${r.category} · ${r.key.replace(/_/g, " ")}`}</div>
                     <div className="mem-value">{r.value}</div>
                   </div>
-                  <Button variant="ghost" size="icon-sm" className="hover:text-destructive" title="Forget this" aria-label={`Forget ${r.key}`}
+                  <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
+                          title="Forget this" aria-label={`Forget ${r.key}`}
                           onClick={async () => {
                             const res = await postJson("/api/memory/forget", { category: r.category, key: r.key });
                             if (res && res.ok) setMemory((m) => m.filter((x) => x !== r));
@@ -176,7 +177,7 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
           </div>
 
           <div className="actions end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit">Save</Button>
           </div>
           <p className="muted">Saving restarts the connection so the tutor uses the new settings. A new voice starts a fresh lesson.</p>
@@ -270,7 +271,7 @@ export function CustomTopicDialog({ open, onOpenChange, topic }: OpenProps & { t
                       placeholder="e.g. Be a barista in a busy coffee shop. I am the customer ordering a drink. Ask about size, milk and snacks." />
           </label>
           <div className="actions">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit">{topic ? "Save" : "Start topic"}</Button>
           </div>
         </form>
@@ -303,7 +304,7 @@ export function KeyDialog() {
           <p>Paste your free key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. It is saved on this computer only.</p>
           <Input type="password" autoComplete="off" placeholder="AIza…" aria-label="Gemini API key"
                  value={key} onChange={(e) => setKey(e.target.value)} />
-          <Button type="submit" className="w-full">Save key</Button>
+          <Button type="submit">Save key</Button>
           <p className="note">{note}</p>
         </form>
       </DialogContent>
@@ -320,7 +321,7 @@ export function ContentDialog() {
       <DialogContent className="sm:max-w-[640px] p-7">
         <DialogHeader><DialogTitle className={TITLE}>{content?.title}</DialogTitle></DialogHeader>
         <pre className="content">{content?.text}</pre>
-        <DialogFooter><Button variant="outline" onClick={() => setContent(null)}>Close</Button></DialogFooter>
+        <DialogFooter><Button variant="outline" type="button" onClick={() => setContent(null)}>Close</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -353,16 +354,15 @@ export function LanguageChoiceDialog({ open, onOpenChange }: OpenProps) {
         </DialogHeader>
         <div className="lang-options">
           {((catalog && catalog.courses) || []).map((c: any) => (
-            <Button key={c.key} variant={c.key === current ? "soft" : "outline"}
-                    className={"choice-btn" + (c.key === current ? " border-primary" : "")}
+            <button type="button" key={c.key} className={"lang-option" + (c.key === current ? " current" : "")}
                     onClick={() => pick(c.name, c.key)}>
               <strong>{c.name}</strong>
               <span>{`${c.levels} · ${c.lessons} lessons`}</span>
-              <span className="choice-note">{c.key === current ? "You are learning it now" : c.learner}</span>
-            </Button>
+              <span className="lang-option-note">{c.key === current ? "You are learning it now" : c.learner}</span>
+            </button>
           ))}
         </div>
-        <DialogFooter className="sm:justify-center"><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button></DialogFooter>
+        <DialogFooter className="sm:justify-center"><Button variant="outline" type="button" onClick={() => onOpenChange(false)}>Cancel</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
