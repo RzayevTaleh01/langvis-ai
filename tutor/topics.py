@@ -12,16 +12,15 @@ subject, deeper questions as the level rises.
 
 Each topic owns a FIXED word list - phrasal verbs, collocations, stronger
 words and ready expressions - in three level tiers. It is written once, the
-first time the topic is opened, saved next to the learner's progress and never
+first time the topic is opened, stored with the learner's progress and never
 regenerated, so the list on screen does not change under them while they talk.
 """
 from __future__ import annotations
 
-import json
 import re
 import threading
-from pathlib import Path
 
+from core import store
 from tutor import analysis as an
 
 KINDS = ("phrasal", "collocation", "word", "expression")
@@ -119,19 +118,16 @@ def has_lexicon(topic: dict) -> bool:
     return not topic.get("free")
 
 
-def lexicon_path(data_dir: Path, topic_id: str) -> Path:
-    return data_dir / "topics" / f"{topic_id}.json"
-
-
-def load_lexicon(data_dir: Path, topic_id: str) -> dict | None:
-    path = lexicon_path(data_dir, topic_id)
-    if not path.exists():
-        return None
+def load_lexicon(language: str, topic_id: str) -> dict | None:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) and data.get("tiers") else None
+        data = store.get("topic_materials", language, topic_id, "lexicon", "")
     except Exception:
         return None
+    return data if isinstance(data, dict) and data.get("tiers") else None
+
+
+def delete_lexicon(language: str, topic_id: str) -> None:
+    store.delete("topic_materials", language, topic_id, "lexicon", "")
 
 
 def is_building(topic_id: str) -> bool:
@@ -170,7 +166,7 @@ Return ONLY JSON:
 }}"""
 
 
-def build_lexicon(data_dir: Path, topic: dict, language_name: str,
+def build_lexicon(language: str, topic: dict, language_name: str,
                   native_language: str) -> dict | None:
     """Write the topic's list once. Blocking (one model call); returns None on
     failure so the caller can try again later - nothing half-written is saved."""
@@ -180,7 +176,7 @@ def build_lexicon(data_dir: Path, topic: dict, language_name: str,
             return None
         _building.add(tid)
     try:
-        existing = load_lexicon(data_dir, tid)
+        existing = load_lexicon(language, tid)
         if existing:
             return existing
         prompt = _lexicon_prompt(topic, language_name, native_language)
@@ -222,9 +218,7 @@ def build_lexicon(data_dir: Path, topic: dict, language_name: str,
         if sum(len(v) for v in tiers.values()) < 12:
             return None
         lexicon = {"topic": tid, "name": topic["name"], "tiers": tiers}
-        path = lexicon_path(data_dir, tid)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(lexicon, indent=2, ensure_ascii=False), encoding="utf-8")
+        store.put("topic_materials", language, tid, "lexicon", "", data=lexicon)
         return lexicon
     except Exception as e:
         print(f"[Topics] lexicon for {tid} failed: {e}")
@@ -247,20 +241,13 @@ STARTER_VERSION = 2
 STARTER_COUNTS = {"words": 6, "collocations": 4, "linkers": 4, "dialogue": 6, "frames": 3}
 
 
-def starter_path(data_dir: Path, topic_id: str, level: str) -> Path:
-    return data_dir / "topics" / f"{topic_id}.starter.{level}.json"
-
-
-def load_starter(data_dir: Path, topic_id: str, level: str) -> dict | None:
-    path = starter_path(data_dir, topic_id, level)
-    if not path.exists():
-        return None
+def load_starter(language: str, topic_id: str, level: str) -> dict | None:
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        ok = isinstance(data, dict) and data.get("words") and data.get("version") == STARTER_VERSION
-        return data if ok else None
+        data = store.get("topic_materials", language, topic_id, "starter", level)
     except Exception:
         return None
+    ok = isinstance(data, dict) and data.get("words") and data.get("version") == STARTER_VERSION
+    return data if ok else None
 
 
 def _starter_audience(level: str) -> str:
@@ -343,7 +330,7 @@ def _clean(value, limit: int = 140) -> str:
     return str(value or "").strip()[:limit]
 
 
-def build_starter(data_dir: Path, topic: dict, language_name: str, native_language: str,
+def build_starter(language: str, topic: dict, language_name: str, native_language: str,
                   level: str, explain_in: str, lexicon: dict | None = None,
                   grammar: list[tuple[str, str]] | None = None,
                   grammar_ids: list[str] | None = None) -> dict | None:
@@ -355,7 +342,7 @@ def build_starter(data_dir: Path, topic: dict, language_name: str, native_langua
             return None
         _building.add(key)
     try:
-        existing = load_starter(data_dir, topic["id"], level)
+        existing = load_starter(language, topic["id"], level)
         if existing:
             return existing
         prompt = _starter_prompt(topic, language_name, native_language, level, explain_in,
@@ -406,9 +393,7 @@ def build_starter(data_dir: Path, topic: dict, language_name: str, native_langua
                 "frames": frames[:STARTER_COUNTS["frames"] + 1]}
         if len(pack["words"]) < 3 or not any(d["who"] == "learner" for d in dialogue):
             return None
-        path = starter_path(data_dir, topic["id"], level)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(pack, indent=2, ensure_ascii=False), encoding="utf-8")
+        store.put("topic_materials", language, topic["id"], "starter", level, data=pack)
         return pack
     except Exception as e:
         print(f"[Topics] starter for {topic['id']} failed: {e}")

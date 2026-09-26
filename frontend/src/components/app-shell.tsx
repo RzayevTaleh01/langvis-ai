@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { LiveProvider, useLive } from "@/components/live-provider";
 import { Header } from "@/components/header";
+import { Button } from "@/components/ui/button";
 import { ContentDialog, KeyDialog } from "@/components/dialogs";
 import { Button } from "@/components/ui/button";
 
@@ -90,7 +91,7 @@ function SeatNotice() {
         <p><strong>{seatTakenBy}</strong> signed in on this computer, so your lesson was stopped.
           Your progress is saved.</p>
         <div className="seat-actions">
-          <Button type="button" onClick={() => window.location.reload()}>Use it here again</Button>
+          <Button onClick={() => window.location.reload()}>Use it here again</Button>
         </div>
       </div>
     </div>

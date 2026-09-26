@@ -7,7 +7,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CourseCard } from "@/components/course-card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LanguageChoiceDialog, useCatalog } from "@/components/dialogs";
 import { useLive } from "@/components/live-provider";
 import { firstName, useAuth } from "@/components/auth-provider";
@@ -32,22 +33,17 @@ function GuestHome() {
         <p className="home-lead">Talk with LangVis by voice. It checks every sentence, shows your mistakes
           on a board and helps you say it better.</p>
         <div className="home-cta">
-          <Button asChild size="lg" className="home-start"><Link href="/register/">Create a free account</Link></Button>
-          <Button asChild variant="outline"><Link href="/login/">I already have an account</Link></Button>
+          <Button asChild size="lg"><Link href="/register/">Create a free account</Link></Button>
+          <Button asChild size="lg" variant="outline"><Link href="/login/">I already have an account</Link></Button>
         </div>
-        <ul className="home-how">
-          <li><strong>Courses</strong><span>Step-by-step lessons from zero. The teacher remembers where you stopped.</span></li>
-          <li><strong>Tutor</strong><span>Free talk about any topic. Mistakes are corrected kindly.</span></li>
-          <li><strong>Progress</strong><span>Your level, words and grammar are saved for you.</span></li>
-        </ul>
+        <Facts catalog={catalog} />
       </section>
 
       <div id="how">
         <TwoWays />
       </div>
       <Courses catalog={catalog} button={(c) => (
-        <Button type="button" onClick={() => router.push(`/register/?learn=${c.name}`)}>
-          {`Learn ${c.name}`}</Button>
+        <Button onClick={() => router.push(`/register/?learn=${c.name}`)}>{`Learn ${c.name}`}</Button>
       )} />
       <HowChecked />
       <Beginners />
@@ -56,7 +52,7 @@ function GuestHome() {
       <section className="home-final">
         <h2>Ready to speak?</h2>
         <p className="home-sub">Your own account keeps your level, course, words and mistakes - only yours.</p>
-        <Button asChild size="lg" className="home-start"><Link href="/register/">Create a free account</Link></Button>
+        <Button asChild size="lg"><Link href="/register/">Create a free account</Link></Button>
         <p className="home-author">langvis.ai · designed and built by Taleh Rzayev</p>
       </section>
     </main>
@@ -91,10 +87,10 @@ function UserHome() {
           <p className="home-lead">{language ? `You are learning ${language}.` : "Choose a language to begin."}
             {" "}Continue your course, or just talk with your tutor.</p>
           <div className="home-cta welcome-cta">
-            <Button asChild size="lg" className="home-start"><Link href="/courses/">Continue my course</Link></Button>
+            <Button asChild size="lg"><Link href="/courses/">Continue my course</Link></Button>
             {/* The Tutor is a page of its own: it is loaded afresh. */}
-            <Button asChild variant="outline"><a href="/tutor/">Talk with the Tutor</a></Button>
-            <Button variant="ghost" type="button" onClick={() => setAsk(true)}>Learn another language</Button>
+            <Button asChild size="lg" variant="outline"><a href="/tutor/">Talk with the Tutor</a></Button>
+            <Button size="lg" variant="ghost" onClick={() => setAsk(true)}>Learn another language</Button>
           </div>
         </div>
         <ul className="welcome-stats">
@@ -107,8 +103,8 @@ function UserHome() {
         </ul>
       </section>
 
-      <Courses catalog={catalog} only={current} language={language} button={(c) => (
-        <Button type="button" onClick={() => openCourse(c.name, c.key)}>
+      <Courses catalog={catalog} button={(c) => (
+        <Button onClick={() => openCourse(c.name, c.key)}>
           {c.key === current ? "Open my course" : `Learn ${c.name}`}</Button>
       )} />
 
@@ -119,13 +115,23 @@ function UserHome() {
 
 // ── Sections ─────────────────────────────────────────────────────────────────
 
-// Signed out: every course. Signed in: only the courses of the language being
-// learned (`only`), since another language is chosen with its own button.
-function Courses({ catalog, button, only, language }: {
-  catalog: any; button: (c: any) => React.ReactNode; only?: string; language?: string;
-}) {
-  const all: any[] = (catalog && catalog.courses) || [];
-  const courses = only ? all.filter((c) => c.key === only) : all;
+// The numbers under the title: counted from the courses themselves.
+function Facts({ catalog }: { catalog: any }) {
+  const courses: any[] = (catalog && catalog.courses) || [];
+  if (!courses.length) return null;
+  const lessons = courses.reduce((n, c) => n + c.lessons, 0);
+  return (
+    <ul className="home-facts">
+      <li><strong>{courses.length}</strong><span>{`languages · ${courses.map((c) => c.name).join(", ")}`}</span></li>
+      <li><strong>{lessons}</strong><span>course lessons, taught step by step</span></li>
+      <li><strong>{catalog.topics}</strong><span>conversation topics, and your own</span></li>
+      <li><strong>Live</strong><span>two-way voice, corrected as you speak</span></li>
+    </ul>
+  );
+}
+
+function Courses({ catalog, button }: { catalog: any; button: (c: any) => React.ReactNode }) {
+  const courses: any[] = (catalog && catalog.courses) || [];
   const current = catalog?.current;
   return (
     <section className="home-section" id="courses">

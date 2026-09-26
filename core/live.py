@@ -19,7 +19,6 @@ released - with a [NEXT] note saying exactly what the reply is: "Did you mean
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import sys
 import threading
@@ -42,7 +41,6 @@ from memory.memory_manager import (
 )
 
 BASE_DIR        = Path(__file__).resolve().parent.parent
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
 LIVE_MODEL      = "models/gemini-3.1-flash-live-preview"
 
@@ -68,8 +66,7 @@ def _get_api_key() -> str:
     from memory.config_manager import get_gemini_keys
     keys = get_gemini_keys()
     if not keys:
-        with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)["gemini_api_key"]
+        raise RuntimeError("No Gemini API key is saved.")
     return keys[_key_turn % len(keys)]
 
 

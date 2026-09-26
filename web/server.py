@@ -23,26 +23,27 @@ Accounts (web/auth.py): every endpoint but sign-in and the course catalog
 needs a signed-in account. There is one microphone and one voice session, so
 one account is in use at a time: when another account signs in, the lesson
 stops, the open tabs of the last account are told ("seat_taken") and closed,
-and core/profile.py points every file at the new account's folder.
+and core/profile.py points every read and write at the new account's rows.
 """
 from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 import webbrowser
 from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
-from core import profile
+from core import profile, store
 from core.live import LiveSession, plugin_fn
 from memory.memory_manager import all_entries_for_ui, forget
 from memory.config_manager import (
     AVAILABLE_VOICES, adopt_legacy_settings, get_assistant_name, get_gemini_keys, get_plugin_config, get_user_name,
     get_voice, is_configured, save_api_keys, save_assistant_config, save_plugin_config,
-    save_voice, set_gemini_keys,
+    save_voice, set_gemini_keys, USER_KEYS,
 )
-from web.auth import Accounts
+from web.auth import Accounts, database_url
 from web.bridge import WebUI
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -69,6 +70,10 @@ class App:
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
     async def on_startup(self, _app: web.Application) -> None:
+        # Everything LangVis keeps lives in the database, next to the accounts.
+        await asyncio.to_thread(store.open, database_url())
+        await self._import_old_files()
+        self.ui.key_ready = await asyncio.to_thread(is_configured)
         loop = asyncio.get_running_loop()
         self.ui.attach(loop)
         self.live = LiveSession(self.ui)
@@ -79,6 +84,37 @@ class App:
                 loop.run_in_executor(None, fn, who, text)
         self.ui.on_line = keep
         asyncio.get_running_loop().create_task(self._push_loop())
+
+    async def _import_old_files(self) -> None:
+        """Earlier versions kept everything in JSON files. They are moved into
+        the database once, and deleted."""
+        config = profile.BASE / "config" / "api_keys.json"
+        if config.is_file() and await asyncio.to_thread(store.import_shared_config, config, USER_KEYS):
+            print("[Web] The Gemini keys moved into the database.")
+        ids = [r["id"] for r in await self.accounts.pool.fetch("SELECT id FROM users ORDER BY id")]
+        if profile.USERS_DIR.is_dir():
+            for folder in sorted(profile.USERS_DIR.glob("u*")):
+                uid = int(folder.name[1:]) if folder.name[1:].isdigit() else None
+                if uid in ids:
+                    moved = await asyncio.to_thread(store.import_account_files, uid, folder,
+                                                    profile.LEGACY_DIRS)
+                    if moved:
+                        print(f"[Web] Account {uid}: {len(moved)} file(s) moved into the database.")
+                    if folder.is_dir() and not any(folder.rglob("*.*")):
+                        await asyncio.to_thread(shutil.rmtree, folder, True)
+            if not any(profile.USERS_DIR.iterdir()):
+                profile.USERS_DIR.rmdir()
+        if ids:
+            await self._adopt_old_progress(ids[0])
+
+    @staticmethod
+    async def _adopt_old_progress(user_id: int) -> None:
+        """The progress made before accounts existed belongs to the first account."""
+        moved = await asyncio.to_thread(store.import_account_files, user_id, profile.BASE,
+                                        profile.LEGACY_DIRS)
+        await asyncio.to_thread(adopt_legacy_settings, user_id)
+        if moved:
+            print(f"[Web] The first account took over the earlier progress: {', '.join(moved)}")
 
     # ── Accounts: whose lesson this is ───────────────────────────────────────
 
@@ -106,6 +142,7 @@ class App:
 
     def _switch_files(self, user_id: int | None) -> None:
         profile.set_user(user_id)
+        store.forget_user_cache()
         fn = plugin_fn("switch_user")
         if fn is not None:
             fn()
@@ -114,10 +151,7 @@ class App:
     async def signed_in(self, user, created: bool, first: bool) -> None:
         if created and first:
             # The first account takes over what was learned before accounts.
-            copied = await asyncio.to_thread(profile.adopt_legacy_data, user["id"])
-            await asyncio.to_thread(adopt_legacy_settings, user["id"])
-            if copied:
-                print(f"[Web] {user['email']} took over the earlier progress: {', '.join(copied)}")
+            await self._adopt_old_progress(user["id"])
         await self.claim(user)
         if created:
             await asyncio.to_thread(self._set_up_account, user)
@@ -633,6 +667,7 @@ def build_app() -> web.Application:
     app.on_startup.append(state.accounts.open)
     app.on_startup.append(state.on_startup)
     app.on_cleanup.append(state.accounts.close)
+    app.on_cleanup.append(lambda _app: asyncio.to_thread(store.close))
     app.router.add_get("/ws", state.socket)
     app.router.add_get("/api/auth/me", state.accounts.me)
     app.router.add_post("/api/auth/register", state.accounts.register)

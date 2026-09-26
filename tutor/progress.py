@@ -1,7 +1,7 @@
 """
 tutor/progress.py - everything the tutor knows about the learner.
 
-One JSON file per language (english/level.json, later slovak/level.json) holds:
+One row per language (learner_progress in the database, core/store.py) holds:
 
   samples / days / totals   how well they speak, measured sentence by sentence
   skills                    per-skill evidence: recent right/wrong uses, real
@@ -17,11 +17,10 @@ state on every update, so the human file can never drift from the numbers.
 """
 from __future__ import annotations
 
-import json
 import time
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
+from core import store
 from tutor import curriculum as cur
 
 # ── Measurement constants ────────────────────────────────────────────────────
@@ -77,11 +76,7 @@ def _today() -> str:
     return date.today().isoformat()
 
 
-# ── Files ────────────────────────────────────────────────────────────────────
-
-def data_dir(base: Path, lang: dict) -> Path:
-    return base / lang["data_dir"]
-
+# ── Stored state ─────────────────────────────────────────────────────────────
 
 def _empty_state() -> dict:
     return {
@@ -111,13 +106,18 @@ def _empty_course() -> dict:
             "completed": [], "finished": False}
 
 
-def load(path: Path) -> dict:
-    if not path.exists():
-        return _empty_state()
+def exists(language: str) -> bool:
+    """Has this language been studied at all (is there a stored state)?"""
+    return store.exists("learner_progress", language)
+
+
+def load(language: str) -> dict:
+    """The learner's state in one language (its lang["data_dir"] key)."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return _empty_state()
+        data = store.get("learner_progress", language)
+    except Exception as e:
+        print(f"[Progress] load failed: {e}")
+        data = None
     if not isinstance(data, dict):
         return _empty_state()
     state = _empty_state()
@@ -129,8 +129,7 @@ def load(path: Path) -> dict:
     return state
 
 
-def save(path: Path, state: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def save(language: str, state: dict) -> None:
     state["samples"] = state.get("samples", [])[-MAX_SAMPLES:]
     days = state.get("days", {})
     if len(days) > MAX_DAYS:
@@ -142,9 +141,7 @@ def save(path: Path, state: dict) -> None:
         for key, _ in sorted(vocab.items(), key=lambda kv: kv[1].get("last", ""))[
                 :len(vocab) - MAX_VOCAB]:
             vocab.pop(key, None)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
-    tmp.replace(path)
+    store.put("learner_progress", language, data=state)
 
 
 def _migrate_v1(state: dict) -> None:
@@ -1113,7 +1110,7 @@ def _cell(value) -> str:
     return str(value or "").replace("|", "/").replace("\n", " ").strip()
 
 
-def render_log(path: Path, state: dict, lang: dict) -> None:
+def render_log(language: str, state: dict, lang: dict) -> str:
     level, score, measured = effective_level(state)
     pos = position(state, lang)
     delta, arrow = trend(state)
@@ -1123,7 +1120,7 @@ def render_log(path: Path, state: dict, lang: dict) -> None:
 
     out = [f"# {lang['name']} progress", "",
            "_Written by LangVis. Regenerated on every update - edits by hand are "
-           "overwritten; `level.json` holds the raw numbers._", "",
+           "overwritten; the database holds the raw numbers._", "",
            "## Where you are", "",
            f"- **Level:** **{level}** ({score:.0f}/100)"
            + ("" if measured else " - still mostly your own estimate"),
@@ -1190,5 +1187,6 @@ def render_log(path: Path, state: dict, lang: dict) -> None:
                     f"| {_cell(c.get('rule'))} |" for c in corrections]
         out += [""]
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(out).rstrip() + "\n", encoding="utf-8")
+    text = "\n".join(out).rstrip() + "\n"
+    store.put("learner_reports", language, data={"markdown": text})
+    return text
