@@ -31,15 +31,12 @@ MODES
 """
 from __future__ import annotations
 
-import json
-import os
 import queue
 import re
-import sys
 import threading
 import time
-from pathlib import Path
 
+from core import store
 from tutor import analysis as an
 from tutor import curriculum as cur
 from tutor import intensive_english, intensive_slovak
@@ -127,15 +124,8 @@ PLUGIN_SETTINGS = {
 }
 
 
-# ── Settings and paths ───────────────────────────────────────────────────────
+# ── Settings ──────────────────────────────────────────────────────────────
 
-def _base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-
-BASE = _base_dir()
 _lock = threading.RLock()
 
 # Values the old english_coach stored are honoured until the learner saves
@@ -170,16 +160,15 @@ def _native() -> str:
     return str(_setting("native_language", "Azerbaijani"))
 
 
-def _paths(lang: dict) -> tuple[Path, Path]:
-    d = _data_dir(lang)
-    return d / "level.json", d / "progress.md"
+def _key(lang: dict) -> str:
+    """The language's key in the learner's stored data ("english", "slovak")."""
+    return lang["data_dir"]
 
 
 def _load(lang: dict | None = None) -> dict:
     lang = lang or _lang()
-    path = _paths(lang)[0]
-    new = not path.exists()
-    state = pg.load(path)
+    new = not pg.exists(_key(lang))
+    state = pg.load(_key(lang))
     if new or not state.get("declared_level"):
         # A language never studied before starts at its course's first level.
         state["declared_level"] = (lang.get("start_level")
@@ -235,11 +224,10 @@ def _p(key: str, **kw) -> str:
 
 def _save(state: dict, lang: dict | None = None, render: bool = True) -> None:
     lang = lang or _lang()
-    state_path, log_path = _paths(lang)
-    pg.save(state_path, state)
+    pg.save(_key(lang), state)
     if render:
         try:
-            pg.render_log(log_path, state, lang)
+            pg.render_log(_key(lang), state, lang)
         except Exception as e:
             print(f"[Tutor] log render failed: {e}")
 
@@ -329,18 +317,12 @@ def _ensure_topic(state: dict) -> bool:
     return pg.switch_topic(state, topic["id"], topic["name"])
 
 
-def _data_dir(lang: dict) -> Path:
-    """The language's folder of the signed-in account (core/profile.py)."""
-    from core import profile
-    return pg.data_dir(profile.user_dir(), lang)
-
-
 def _lexicon(lang: dict, topic: dict) -> dict | None:
     """The topic's fixed list, or None while it is still being written - in
     which case the writing is started in the background."""
     if not tp.has_lexicon(topic):
         return None
-    lex = tp.load_lexicon(_data_dir(lang), topic["id"])
+    lex = tp.load_lexicon(_key(lang), topic["id"])
     failed_at, failures = _lexicon_failed.get(topic["id"], (-1e9, 0))
     if (lex is None and not tp.is_building(topic["id"]) and failures < LEXICON_TRIES
             and time.monotonic() - failed_at > LEXICON_RETRY):
@@ -355,7 +337,7 @@ _lexicon_failed: dict[str, tuple[float, int]] = {}
 
 
 def _build_lexicon(lang: dict, topic: dict) -> None:
-    lex = tp.build_lexicon(_data_dir(lang), topic, lang["name"], _native())
+    lex = tp.build_lexicon(_key(lang), topic, lang["name"], _native())
     if not lex:
         failures = _lexicon_failed.get(topic["id"], (0.0, 0))[1] + 1
         _lexicon_failed[topic["id"]] = (time.monotonic(), failures)
@@ -743,9 +725,8 @@ def _handle(text: str, player, result: dict | None = None, react: bool = True) -
                 _analysis_failed(player, e)
                 return {}
         if result:
-            state_path = _paths(lang)[0]
             with _lock:
-                before_raw = state_path.read_text(encoding="utf-8") if state_path.exists() else ""
+                before_raw = store.get("learner_progress", _key(lang))
                 state = _load(lang)
                 # The board's upgrades become the learner's too: they were shown
                 # and asked to say them, so their uses are counted from now on.
@@ -754,7 +735,7 @@ def _handle(text: str, player, result: dict | None = None, react: bool = True) -
                                          "level": e["level"], "meaning": e["meaning"],
                                          "native": e["native"]},
                                  topic=topic["id"], source="board")
-                lex = tp.load_lexicon(_data_dir(lang), topic["id"])
+                lex = tp.load_lexicon(_key(lang), topic["id"])
                 pg.sync_topic_all(state, lex)
                 pg.sync_topic_deck(state, lex, level)
                 # Their own words are their vocabulary: into the dictionary,
@@ -979,7 +960,7 @@ def reset_lesson() -> None:
 
 def switch_user() -> None:
     """Another account is signed in (core/profile.py already points at its
-    folder): nothing of the last learner may reach the new one - not a turn in
+    data): nothing of the last learner may reach the new one - not a turn in
     progress, not a sentence still waiting to be analysed, not a cached status."""
     while True:
         try:
@@ -1523,11 +1504,10 @@ def _unit_grammar(state: dict, lang: dict) -> tuple[list[tuple[str, str]], list[
 
 def _build_pack(lang: dict, topic: dict, level: str, grammar: list, grammar_ids: list) -> dict | None:
     """The topic's dictionary first (the lesson teaches from it), then the lesson."""
-    data_dir = _data_dir(lang)
-    lex = tp.load_lexicon(data_dir, topic["id"])
+    lex = tp.load_lexicon(_key(lang), topic["id"])
     if lex is None:
-        lex = tp.build_lexicon(data_dir, topic, lang["name"], _native())
-    return tp.build_starter(data_dir, topic, lang["name"], _native(), level, _explain_in(level),
+        lex = tp.build_lexicon(_key(lang), topic, lang["name"], _native())
+    return tp.build_starter(_key(lang), topic, lang["name"], _native(), level, _explain_in(level),
                             lexicon=lex, grammar=grammar, grammar_ids=grammar_ids)
 
 
@@ -1538,7 +1518,7 @@ def _starter(state: dict, lang: dict, wait: bool = False) -> dict | None:
     if not tp.has_lexicon(topic):
         return None
     level = _starter_level(state, lang)
-    pack = tp.load_starter(_data_dir(lang), topic["id"], level)
+    pack = tp.load_starter(_key(lang), topic["id"], level)
     if pack:
         return pack
     key = f"{lang['name']}:{topic['id']}:{level}"
@@ -1744,7 +1724,7 @@ def _teach_say(pack: dict, step: dict) -> str:
     elif kind == "extend" and step.get("own"):
         body = (f"Now the learner makes THEIR OWN sentence longer. In {ex}: ask them to say one short "
                 "sentence about themselves on this topic, and then the same sentence longer - with "
-                "when, where, why or a linking word they just learned. Give one example, then STOP.")
+                "when, where, who with, why or a word they just learned. Give one example, then STOP.")
     elif kind == "extend":
         body = ((f"Show how \"{step['prev']}\" grows ({it.get('how') or 'one more part'}): "
                  if step.get("prev") else "Start with a short sentence: ")
@@ -1946,7 +1926,7 @@ def _teach_again(player=None) -> str:
 
 INTENSIVE_COURSES = {"slovak": intensive_slovak.COURSE, "english": intensive_english.COURSE}
 # Every language on the Courses page; one without a course yet shows as coming.
-COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("english", "English", "A2 → B1")]
+COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("english", "English", "A2 → B1+")]
 REVIEW_ITEMS = 4
 
 
@@ -1958,14 +1938,9 @@ def _intensive_on() -> bool:
     return str(_setting("track", "normal")) == "intensive" and _course() is not None
 
 
-def _intensive_path(lang: dict | None = None) -> Path:
-    return _data_dir(lang or _lang()) / "intensive.json"
-
-
 def _intensive_load(lang: dict | None = None) -> dict:
-    path = _intensive_path(lang)
     try:
-        data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        data = store.get("course_progress", _key(lang or _lang())) or {}
     except Exception:
         data = {}
     data.setdefault("lesson", 0)
@@ -1976,9 +1951,7 @@ def _intensive_load(lang: dict | None = None) -> dict:
 
 
 def _intensive_save(data: dict, lang: dict | None = None) -> None:
-    path = _intensive_path(lang)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    store.put("course_progress", _key(lang or _lang()), data=data)
 
 
 def _current_lesson(prog: dict | None = None) -> tuple[int, dict] | None:
@@ -2022,6 +1995,7 @@ def _lesson_pack(idx: int, lesson: dict) -> dict:
                     "meanings": [en for _sk, en in g["examples"]], "skills": g.get("skills", [])},
         "dialogue": lesson["dialogue"],
         "translate": lesson.get("translate") or [],
+        "extend": lesson.get("extend") or [],
         "build": lesson.get("build") or [],
         "questions": lesson["questions"],
         "speak": lesson["speak"],
@@ -2182,8 +2156,7 @@ def _language_level(key: str, lang: dict) -> dict:
     """Where the learner is in one language, for the language select:
     "English · B1", "Slovak · A1"."""
     try:
-        path = _paths(lang)[0]
-        state = pg.load(path) if path.exists() else {}
+        state = pg.load(_key(lang)) if pg.exists(_key(lang)) else {}
         if not state.get("declared_level"):
             state["declared_level"] = lang.get("start_level") or "A2"
         band, score, _ = pg.effective_level(state)
@@ -2296,6 +2269,7 @@ def _course_card(key: str, name: str, levels: str, c: dict) -> dict:
              for w in c["weeks"]]
     return {"key": key, "name": name, "levels": levels, "title": c["title"],
             "learner": c.get("about") or c.get("learner", ""), "lessons": len(c["lessons"]),
+            "outcomes": c.get("outcomes") or [l["goal"] for l in c["lessons"][::max(1, len(c["lessons"]) // 6)]][:6],
             "words": sum(len(l.get("words") or []) + len(l.get("phrases") or []) for l in c["lessons"]),
             "weeks": weeks}
 
@@ -2322,7 +2296,8 @@ def catalog_for_ui(progress: bool = False) -> dict:
         if progress:
             card["progress"] = _course_progress(key, c)
         out.append(card)
-    return {"current": _mode_key() if progress else "", "courses": out}
+    return {"current": _mode_key() if progress else "", "courses": out,
+            "topics": sum(1 for t in tp.TOPICS if not t.get("free"))}
 
 
 def course_for_ui(key: str) -> dict:
@@ -2372,60 +2347,55 @@ def intensive_for_ui() -> dict:
     for n, l in enumerate(course["lessons"]):
         state = ("done" if l["id"] in prog["done"] else
                  "current" if n == idx else "locked")
+        parts: list[dict] = []
+        for st in _teach_steps(_lesson_pack(n, l)):
+            if not parts or parts[-1]["kind"] != st["kind"]:
+                parts.append({"kind": st["kind"], "label": _SECTION[st["kind"]][0], "count": 0})
+            parts[-1]["count"] += 1
         lessons.append({"index": n, "id": l["id"], "week": l["week"], "day": l["day"],
                         "band": l["band"], "title": l["title"], "goal": l["goal"], "state": state,
-                        "open": n <= len(prog["done"]), "words": [w["text"] for w in l["words"]]})
-    steps = len(_teach_steps(_lesson_pack(idx, course["lessons"][idx])))
+                        "open": n <= len(prog["done"]), "words": [w["text"] for w in l["words"]],
+                        "phrases": [p["text"] for p in l.get("phrases") or []],
+                        "grammar": (l.get("grammar") or {}).get("name", ""),
+                        "speak": l.get("speak", ""), "parts": parts,
+                        "steps": sum(pt["count"] for pt in parts)})
+    steps = lessons[idx]["steps"]
     return {"available": True, "active": active, "language": _lang()["name"], "courses": courses,
-            "title": course["title"], "weeks": course["weeks"], "lessons": lessons,
+            "title": course["title"], "about": course.get("about", ""),
+            "levels": next((lv for k, _n, lv in COURSE_CATALOG if k == _mode_key()), ""),
+            "outcomes": _course_card(_mode_key(), _lang()["name"], "", course)["outcomes"],
+            "words_total": sum(len(l["words"]) + len(l.get("phrases") or []) for l in course["lessons"]),
+            "weeks": course["weeks"], "lessons": lessons,
             "current": idx, "step": int(prog.get("step", 0)), "steps": steps,
             "done": len(prog["done"]), "total": len(course["lessons"])}
 
 
 # ── The conversation, kept per topic ─────────────────────────────────────────
-# Every line said - the learner's and the tutor's - is written to
-# <lang>/history/<topic>.jsonl, so each topic keeps its whole conversation.
+# Every line said - the learner's and the tutor's - is a row of
+# conversation_lines (core/store.py), so each topic keeps its whole conversation.
 
 HISTORY_SHOWN = 400
 
 
-def _history_path(lang: dict, topic_id: str) -> Path:
-    return _data_dir(lang) / "history" / f"{tp.slug(topic_id)}.jsonl"
-
-
 def record_line(who: str, text: str) -> None:
     """One line of the conversation, into the current topic's history."""
-    import json
     text = str(text or "").strip()
     if not text:
         return
     lang = _lang()
     with _lock:
         topic = "intensive" if _intensive_on() else (_load(lang).get("topic") or tp.DEFAULT_TOPIC)
-        path = _history_path(lang, topic)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "who": who,
-                                "text": text[:2000]}, ensure_ascii=False) + "\n")
+    store.add_line(_key(lang), tp.slug(topic), who, text[:2000])
 
 
 def history_for_ui(topic_id: str = "") -> dict:
     """The conversation of one topic (the current one by default), newest last."""
-    import json
     lang = _lang()
     with _lock:
         state = _load(lang)
     # The course keeps a conversation of its own, apart from the topics.
     topic_id = "intensive" if _intensive_on() else (topic_id or state.get("topic") or tp.DEFAULT_TOPIC)
-    path = _history_path(lang, topic_id)
-    lines = []
-    if path.exists():
-        for raw in path.read_text(encoding="utf-8").splitlines()[-HISTORY_SHOWN:]:
-            try:
-                lines.append(json.loads(raw))
-            except Exception:
-                continue
-    return {"topic": topic_id, "lines": lines}
+    return {"topic": topic_id, "lines": store.lines(_key(lang), tp.slug(topic_id), HISTORY_SHOWN)}
 
 
 def _memory_facts(limit: int = 700) -> str:
@@ -2568,7 +2538,6 @@ def undo_last(player=None) -> tuple[bool, str]:
     """'I didn't say that': take the last analysed sentence back - its score,
     its mistakes, its word counts - if nothing has been recorded since."""
     lang = _lang()
-    path = _paths(lang)[0]
     with _lock:
         if not _last_record:
             return False, "There is nothing to take back."
@@ -2576,13 +2545,13 @@ def undo_last(player=None) -> tuple[bool, str]:
         if state.get("totals", {}).get("target_utterances", 0) != _last_record.get("count"):
             return False, "Another sentence was recorded after it - it cannot be taken back now."
         if _last_record.get("raw"):
-            path.write_text(_last_record["raw"], encoding="utf-8")
-        elif path.exists():
-            path.unlink()
+            store.put("learner_progress", _key(lang), data=_last_record["raw"])
+        else:
+            store.delete("learner_progress", _key(lang))
         text = _last_record.get("text", "")
         _last_record.clear()
         try:
-            pg.render_log(_paths(lang)[1], _load(lang), lang)
+            pg.render_log(_key(lang), _load(lang), lang)
         except Exception:
             pass
     with _coaching_lock:
@@ -2816,13 +2785,9 @@ def status_for_ui() -> dict:
     """Polled by the interface; re-reads only on change."""
     try:
         lang = _lang()
-        path = _paths(lang)[0]
-        mtime = path.stat().st_mtime if path.exists() else 0
-        lex_dir = _data_dir(lang) / "topics"
-        lex_mtime = lex_dir.stat().st_mtime if lex_dir.exists() else 0
-        ipath = _intensive_path(lang)
-        key = (lang["name"], mtime, lex_mtime, time.strftime("%Y-%m-%d"),
-               ipath.stat().st_mtime if ipath.exists() else 0, str(_setting("track", "normal")))
+        key = (lang["name"], store.version("learner_progress"), store.version("topic_materials"),
+               time.strftime("%Y-%m-%d"), store.version("course_progress"),
+               str(_setting("track", "normal")))
         if _status_cache["key"] != key:
             with _lock:
                 state = _load(lang)
@@ -2838,7 +2803,7 @@ def status_for_ui() -> dict:
             value["topic"] = {"id": topic["id"], "name": topic["name"],
                               "az": topic.get("az", topic["name"])}
             value["topics"] = _topics_list(state)
-            value["lexicon_ready"] = tp.load_lexicon(_data_dir(lang), topic["id"]) is not None
+            value["lexicon_ready"] = tp.load_lexicon(_key(lang), topic["id"]) is not None
             value["track"] = "intensive" if _intensive_on() else "normal"
             if _course():
                 value["intensive"] = _intensive_status()
@@ -2860,9 +2825,7 @@ def syllabus_for_ui() -> list:
     status: re-read only when the learner's file has actually changed."""
     try:
         lang = _lang()
-        path = _paths(lang)[0]
-        mtime = path.stat().st_mtime if path.exists() else 0
-        key = (lang["name"], mtime)
+        key = (lang["name"], store.version("learner_progress"))
         if _syllabus_cache["key"] != key:
             with _lock:
                 state = _load(lang)
@@ -2993,7 +2956,7 @@ def delete_topic(topic_id: str = "", player=None, announce: bool = True) -> tupl
         _save(state, lang)
     if entry.get("custom"):
         try:
-            tp.lexicon_path(_data_dir(lang), topic_id).unlink(missing_ok=True)
+            tp.delete_lexicon(_key(lang), topic_id)
         except Exception:
             pass
     if was_current and announce:
@@ -3089,7 +3052,7 @@ def run(parameters: dict, player=None, session_memory=None) -> str:
         if action in ("set_mode", "mode", "language"):
             return _set_mode(parameters.get("mode", ""))
         if action in ("open_log", "open", "log"):
-            return _open_log()
+            return _open_log(player)
         if action in ("next_lesson", "continue_course") and _intensive_on():
             return _intensive_next(player)
         if action in ("repeat_lesson", "restart_lesson") and _intensive_on():
@@ -3412,14 +3375,14 @@ def _save_setting(values: dict) -> None:
         pass
 
 
-def _open_log() -> str:
+def _open_log(player=None) -> str:
+    """The readable progress summary, shown on the page."""
     lang = _lang()
-    state_path, log_path = _paths(lang)
     with _lock:
-        if not log_path.exists():
-            pg.render_log(log_path, _load(lang), lang)
-    try:
-        os.startfile(str(log_path))       # noqa: S606 - Windows shell open
-        return f"Opened the progress file ({log_path.name})."
-    except Exception:
-        return f"The progress file is at {log_path}."
+        report = store.get("learner_reports", _key(lang)) or {}
+        text = report.get("markdown") or pg.render_log(_key(lang), _load(lang), lang)
+    player = player or _player
+    if player is not None and hasattr(player, "show_content"):
+        player.show_content(f"{lang['name']} progress", text)
+        return "Opened the progress summary on the page."
+    return text

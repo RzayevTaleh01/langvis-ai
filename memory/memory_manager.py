@@ -5,7 +5,7 @@ from threading import Lock
 from pathlib import Path
 import sys
 
-from core import profile
+from core import store
 
 
 def get_base_dir() -> Path:
@@ -56,21 +56,17 @@ def _empty_memory() -> dict:
     }
 
 def load_memory() -> dict:
-    if not profile.memory_path().exists():
-        return _empty_memory()
     with _lock:
         try:
-            data = json.loads(profile.memory_path().read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                base = _empty_memory()
-                for key in base:
-                    if key not in data:
-                        data[key] = {}
-                return data
-            return _empty_memory()
+            data = store.get("user_memory")
         except Exception as e:
             print(f"[Memory] ⚠️ Load error: {e}")
-            return _empty_memory()
+            data = None
+    if not isinstance(data, dict):
+        return _empty_memory()
+    for key in _empty_memory():
+        data.setdefault(key, {})
+    return data
 
 def _all_entries(memory: dict) -> list[tuple]:
     entries = []
@@ -120,12 +116,8 @@ def save_memory(memory: dict) -> None:
     if not isinstance(memory, dict):
         return
     memory = _trim_to_limit(memory)
-    profile.memory_path().parent.mkdir(parents=True, exist_ok=True)
     with _lock:
-        profile.memory_path().write_text(
-            json.dumps(memory, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        store.put("user_memory", data=memory)
 
 
 def _truncate_value(val: str) -> str:
@@ -434,7 +426,7 @@ _SESSION_MAX = 300
 
 
 def save_session_summary(summary: str, language: str = "") -> None:
-    """Append a 1-2 sentence session summary to long_term.json['sessions']."""
+    """Append a 1-2 sentence session summary to the memory's 'sessions'."""
     summary = (summary or "").strip()
     if not summary:
         return
@@ -451,11 +443,7 @@ def save_session_summary(summary: str, language: str = "") -> None:
     sessions.append(entry)
     memory["sessions"] = sessions[-_SESSION_MAX:]
     with _lock:
-        profile.memory_path().parent.mkdir(parents=True, exist_ok=True)
-        profile.memory_path().write_text(
-            json.dumps(memory, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        store.put("user_memory", data=memory)
     print(f"[Memory] 📝 Session saved ({entry['date']}): {summary[:60]}…")
 
 
@@ -469,10 +457,10 @@ def pop_last_session(language: str = "") -> dict | None:
     deleting was discarding the archive in order to solve it.
     """
     with _lock:
-        if not profile.memory_path().exists():
-            return None
         try:
-            memory   = json.loads(profile.memory_path().read_text(encoding="utf-8"))
+            memory   = store.get("user_memory")
+            if not isinstance(memory, dict):
+                return None
             sessions = memory.get("sessions", [])
             if not isinstance(sessions, list) or not sessions:
                 return None
@@ -482,10 +470,7 @@ def pop_last_session(language: str = "") -> dict | None:
             if entry is None:
                 return None
             entry["mentioned"] = True
-            profile.memory_path().write_text(
-                json.dumps(memory, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
+            store.put("user_memory", data=memory)
             return entry
         except Exception as e:
             print(f"[Memory] ⚠️ pop_last_session error: {e}")

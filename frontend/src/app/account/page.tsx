@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLive } from "@/components/live-provider";
@@ -64,8 +65,8 @@ export default function AccountPage() {
             : res ? `Level ${res.level} · ${Math.round(res.score)}/100 · goal ${res.goal}` + (res.measured ? "" : " · still mostly your own estimate") : ""}</p>
         </div>
         <div className="head-actions">
-          <Link className="btn" href="/account/dictionary/">Dictionary</Link>
-          <Link className="btn" href="/account/grammar/">Grammar</Link>
+          <Button asChild variant="outline"><Link href="/account/dictionary/">Dictionary</Link></Button>
+          <Button asChild variant="outline"><Link href="/account/grammar/">Grammar</Link></Button>
         </div>
       </div>
       {res && (

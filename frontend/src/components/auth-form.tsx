@@ -5,6 +5,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { postJson } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const LANGUAGES = [
   { name: "English", note: "A2 → B1 · explained simply" },
@@ -60,18 +62,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {register && (
           <label className="auth-field">
             <span>Your name</span>
-            <input className="input" type="text" autoComplete="name" required maxLength={40}
+            <Input type="text" autoComplete="name" required maxLength={40}
                    value={name} onChange={(e) => setName(e.target.value)} placeholder="The tutor calls you by it" />
           </label>
         )}
         <label className="auth-field">
           <span>Email</span>
-          <input className="input" type="email" autoComplete="email" required
+          <Input type="email" autoComplete="email" required
                  value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label className="auth-field">
           <span>Password</span>
-          <input className="input" type="password" required minLength={register ? 8 : undefined}
+          <Input type="password" required minLength={register ? 8 : undefined}
                  autoComplete={register ? "new-password" : "current-password"}
                  value={password} onChange={(e) => setPassword(e.target.value)}
                  placeholder={register ? "At least 8 characters" : ""} />
@@ -82,12 +84,13 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             <span>I want to learn</span>
             <div className="auth-langs">
               {LANGUAGES.map((l) => (
-                <button type="button" key={l.name} aria-pressed={learning === l.name}
-                        className={"lang-option" + (learning === l.name ? " current" : "")}
+                <Button key={l.name} aria-pressed={learning === l.name}
+                        variant={learning === l.name ? "soft" : "outline"}
+                        className={"choice-btn" + (learning === l.name ? " border-primary" : "")}
                         onClick={() => setLearning(l.name)}>
                   <strong>{l.name}</strong>
-                  <span className="lang-option-note">{l.note}</span>
-                </button>
+                  <span className="choice-note">{l.note}</span>
+                </Button>
               ))}
             </div>
           </fieldset>
@@ -95,9 +98,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
         {error && <p className="auth-error" role="alert">{error}</p>}
 
-        <button className="btn primary auth-submit" type="submit" disabled={busy}>
+        <Button className="auth-submit w-full" size="lg" type="submit" disabled={busy}>
           {busy ? "One moment…" : register ? "Create account" : "Log in"}
-        </button>
+        </Button>
 
         <p className="auth-switch">
           {register ? "Already have an account? " : "New to LangVis? "}

@@ -13,6 +13,8 @@ import {
   KeyboardIcon, MicOffIcon, MicOnIcon, PlayIcon, RestartIcon, SendIcon, SkipIcon, StopIcon,
 } from "@/components/icons";
 import { CourseSide } from "@/components/course-side";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
   const live = useLive();
@@ -52,9 +54,9 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
               <p id="start-what">{kind === "tutor"
                 ? "Free conversation: talk about anything, ask about any grammar or word. Press Start and your tutor begins."
                 : "Your course lesson, step by step. Press Start and the teacher begins."}</p>
-              <button className="btn primary start-btn" id="start-btn" type="button" onClick={() => live.begin()}>
+              <Button size="lg" className="start-btn" id="start-btn" onClick={() => live.begin()}>
                 <PlayIcon />
-                Start</button>
+                Start</Button>
             </div>
           </div>
         )}
@@ -65,7 +67,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
             </span>
             <span className="spacer" />
             <span className="state-pill" id="tutor-state">{pill}</span>
-            <button className="icon-btn small" id="restart" type="button" title="Start the lesson again"
+            <Button variant="ghost" size="icon-sm" id="restart" title="Start the lesson again"
                     aria-label="Start the lesson again"
                     onClick={() => {
                       if (!live.started) return;
@@ -74,7 +76,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
                       live.flash("Starting the lesson again…");
                     }}>
               <RestartIcon />
-            </button>
+            </Button>
           </div>
           <div className="speech empty" aria-live="polite">
             <span className="speech-who">LangVis says</span>
@@ -83,10 +85,10 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
         </div>
         <div className="waiting hidden" id="waiting">
           <div><span className="waiting-label">Your turn - say:</span> <span id="waiting-text" /></div>
-          <button className="btn ghost small" id="skip" type="button" title="Go on without repeating"
+          <Button variant="outline" size="sm" id="skip" title="Go on without repeating"
                   onClick={() => live.send({ type: "skip" })}>
             <SkipIcon />
-            Skip</button>
+            Skip</Button>
         </div>
 
         <div className="answers hidden" id="answers-block">
@@ -95,7 +97,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
         </div>
 
         <div className="block" id="said-block">
-          <div className="label">You said <button className="link" id="undo" type="button" hidden>I didn&apos;t say that</button></div>
+          <div className="label">You said <Button variant="link" size="xs" id="undo" hidden>I didn&apos;t say that</Button></div>
           <p className="sentence" id="said"><span className="hint">Speak - your sentence is written here.</span></p>
         </div>
 
@@ -191,9 +193,11 @@ function SidePanel() {
   return (
     <aside className="side">
       <div className="tabs" role="tablist">
-        <button className={"tab" + (tab === "words" ? " active" : "")} role="tab" onClick={() => setTab("words")}>
-          {deck.intensive ? "Lesson words" : "Topic words"}</button>
-        <button className={"tab" + (tab === "transcript" ? " active" : "")} role="tab" onClick={() => setTab("transcript")}>Transcript</button>
+        <Button variant={tab === "words" ? "soft" : "ghost"} size="sm" className="flex-1" role="tab"
+                aria-selected={tab === "words"} onClick={() => setTab("words")}>
+          {deck.intensive ? "Lesson words" : "Topic words"}</Button>
+        <Button variant={tab === "transcript" ? "soft" : "ghost"} size="sm" className="flex-1" role="tab"
+                aria-selected={tab === "transcript"} onClick={() => setTab("transcript")}>Transcript</Button>
       </div>
       <div className={"pane" + (tab === "words" ? "" : " hidden")} id="pane-words">
         <div className="pane-head" id="words-head">{head}</div>
@@ -317,12 +321,12 @@ function Controls() {
   return (
     <footer className="controls">
       <div className={"voicebar" + (typing ? " hidden" : "")} id="voicebar">
-        <button className="mic-toggle" id="mic" type="button" aria-pressed={!live.muted} aria-label="Microphone"
+        <Button size="icon-lg" className="mic-toggle" id="mic" aria-pressed={!live.muted} aria-label="Microphone"
                 title={live.muted ? "Microphone off - click to turn it on (F4)" : "Microphone on - click to turn it off (F4)"}
                 onClick={() => live.send({ type: "mute", value: !live.muted })}>
           <MicOnIcon />
           <MicOffIcon />
-        </button>
+        </Button>
         <canvas id="wave" aria-hidden="true" ref={wave} />
         <span className="voice-hint" id="voice-hint" ref={hint}>Just talk - I&apos;m listening</span>
       </div>
@@ -333,19 +337,19 @@ function Controls() {
               live.send({ type: "text", text: text.trim() });
               setText("");
             }}>
-        <input ref={inputRef} id="text" type="text" autoComplete="off" placeholder="Type a sentence and press Enter…"
-               aria-label="Type a sentence" value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="send" type="submit" title="Send" aria-label="Send"><SendIcon /></button>
+        <Input ref={inputRef} id="text" type="text" autoComplete="off" placeholder="Type a sentence and press Enter…"
+               className="h-11" aria-label="Type a sentence" value={text} onChange={(e) => setText(e.target.value)} />
+        <Button type="submit" size="icon-lg" title="Send" aria-label="Send"><SendIcon /></Button>
       </form>
       <div className="control-buttons">
-        <button className={"icon-btn keyboard" + (typing ? " active" : "")} id="keyboard-btn" type="button"
+        <Button variant={typing ? "default" : "outline"} size="icon-lg" id="keyboard-btn" aria-pressed={typing}
                 title="Type a message instead" aria-label="Type a message" onClick={() => setTyping((t) => !t)}>
           <KeyboardIcon />
-        </button>
-        <button className="btn ghost" id="interrupt" type="button"
+        </Button>
+        <Button variant="outline" size="lg" className="flex-1" id="interrupt"
                 onClick={() => { live.audio.flush(); live.send({ type: "interrupt" }); }}>
           <StopIcon />
-          Interrupt</button>
+          Interrupt</Button>
       </div>
     </footer>
   );

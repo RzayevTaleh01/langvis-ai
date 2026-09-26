@@ -32,7 +32,6 @@ def _base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-API_CONFIG = _base_dir() / "config" / "api_keys.json"
 
 
 # ── Is this English? ─────────────────────────────────────────────────────────
@@ -170,11 +169,10 @@ _last_used: dict[str, str] = {}                 # first model of a chain -> the 
 
 def _keys() -> list[str]:
     try:
-        data = json.loads(API_CONFIG.read_text(encoding="utf-8"))
+        from memory.config_manager import get_gemini_keys
+        return get_gemini_keys()
     except Exception:
         return []
-    keys = [data.get("gemini_api_key") or ""] + list(data.get("gemini_extra_keys") or [])
-    return [k for k in dict.fromkeys(str(k).strip() for k in keys) if len(k) > 15]
 
 
 def _client_for(key: str):

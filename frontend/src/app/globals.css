@@ -9,6 +9,7 @@
 @import "shadcn/tailwind.css";
 @import "./bootstrap.css" layer(bootstrap);
 @import "./legacy.css" layer(legacy);
+@import "./langvis.css" layer(legacy);
 
 @custom-variant dark (&:is(.dark *));
 
@@ -80,7 +81,7 @@
   --chart-3: #c98a0a;
   --chart-4: #3a6e32;
   --chart-5: #948b78;
-  --radius: 0.75rem;
+  --radius: 0.5rem;
   --sidebar: #fffdf9;
   --sidebar-foreground: #23201a;
   --sidebar-primary: #12695a;
@@ -137,3 +138,10 @@
     @apply font-sans;
   }
 }
+
+/* The microphone button: its colour follows who has the floor. Outside the
+   layers, so it wins over the Button's own colour utilities. */
+body[data-muted="true"] .mic-toggle { background: var(--bad-ghost); color: var(--bad); }
+body[data-muted="true"] .mic-toggle .mic-on { display: none; }
+body[data-muted="true"] .mic-toggle .mic-off { display: block; }
+body[data-mic="wait"]:not([data-muted="true"]) .mic-toggle { background: var(--panel-2); color: var(--ink-dim); }

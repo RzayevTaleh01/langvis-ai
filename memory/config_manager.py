@@ -1,74 +1,40 @@
-import json
-import sys
-from pathlib import Path
+from core import store
 
-from core import profile
-
-
-def get_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent.parent
-
-BASE_DIR    = get_base_dir()
-CONFIG_DIR  = BASE_DIR / "config"
-CONFIG_FILE = CONFIG_DIR / "api_keys.json"
-
-# ── Two files ────────────────────────────────────────────────────────────────
-# The Gemini keys belong to the computer: config/api_keys.json, shared by every
-# account. Names, voice and the tutor's settings belong to the learner: with an
-# account signed in they live in users/u<id>/settings.json (core/profile.py).
-# Without one, everything stays in api_keys.json as it always did.
+# ── Two places ───────────────────────────────────────────────────────────────
+# The Gemini keys belong to the computer: the "config" row of app_settings,
+# shared by every account. Names, voice and the tutor's settings belong to the
+# learner: the account's row of user_settings (core/store.py).
 USER_KEYS = ("assistant_name", "user_name", "voice_name", "plugin_config")
 
 
-def ensure_config_dir() -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+def _shared() -> dict:
+    data = store.get("app_settings", "config")
+    return data if isinstance(data, dict) else {}
 
 
-def _read(path: Path) -> dict:
-    if not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except Exception as e:
-        print(f"❌ Failed to load {path.name}: {e}")
-        return {}
+def _own() -> dict:
+    data = store.get("user_settings")
+    return data if isinstance(data, dict) else {}
 
 
 def load_api_keys() -> dict:
     """Every setting in force: the shared ones, and the account's own on top."""
-    data = _read(CONFIG_FILE)
-    user_file = profile.settings_path()
-    if user_file is not None:
-        mine = _read(user_file)
-        for key in USER_KEYS:
-            data.pop(key, None)
-            if key in mine:
-                data[key] = mine[key]
+    data = {k: v for k, v in _shared().items() if k not in USER_KEYS}
+    data.update({k: v for k, v in _own().items() if k in USER_KEYS})
     return data
 
 
 def _write(data: dict) -> None:
     """Store `data` (a whole load_api_keys() dict): the account's own keys to
-    its file, the rest to the shared one."""
-    ensure_config_dir()
-    user_file = profile.settings_path()
-    if user_file is None:
-        CONFIG_FILE.write_text(json.dumps(data, indent=4), encoding="utf-8")
-        return
-    shared = _read(CONFIG_FILE)
+    its row, the rest to the shared one."""
+    shared = _shared()
     shared.update({k: v for k, v in data.items() if k not in USER_KEYS})
-    CONFIG_FILE.write_text(json.dumps(shared, indent=4), encoding="utf-8")
-    mine = {k: data[k] for k in USER_KEYS if k in data}
-    user_file.parent.mkdir(parents=True, exist_ok=True)
-    user_file.write_text(json.dumps(mine, indent=4, ensure_ascii=False), encoding="utf-8")
+    store.put("app_settings", "config", data=shared)
+    store.put("user_settings", data={k: data[k] for k in USER_KEYS if k in data})
 
 
 def _patch_config(**fields) -> None:
-    """Read-modify-write one or more keys. Every setter goes through here, so
-    there is one place where a corrupt file is handled."""
+    """Read-modify-write one or more keys. Every setter goes through here."""
     data = load_api_keys()
     data.update(fields)
     _write(data)
@@ -189,11 +155,8 @@ def save_plugin_enabled(plugin_name: str, enabled: bool) -> None:
 
 def adopt_legacy_settings(user_id: int) -> None:
     """The first account takes over the names, voice and tutor settings made
-    before accounts existed (they stay in api_keys.json as well)."""
-    user_file = profile.settings_path(user_id)
-    if user_file is None or user_file.exists():
-        return
-    shared = _read(CONFIG_FILE)
-    mine = {k: shared[k] for k in USER_KEYS if k in shared}
-    user_file.parent.mkdir(parents=True, exist_ok=True)
-    user_file.write_text(json.dumps(mine, indent=4, ensure_ascii=False), encoding="utf-8")
+    before accounts existed."""
+    own = store.get("app_settings", "unclaimed_user_settings")
+    if isinstance(own, dict) and store.get("user_settings", user_id=user_id) is None:
+        store.put("user_settings", data=own, user_id=user_id)
+    store.delete("app_settings", "unclaimed_user_settings")

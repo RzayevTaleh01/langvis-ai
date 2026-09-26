@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LanguageChoiceDialog, useCatalog } from "@/components/dialogs";
 import { useLive } from "@/components/live-provider";
@@ -32,23 +33,17 @@ function GuestHome() {
           Learn a language step by step in a <strong>course</strong>, or talk freely with your{" "}
           <strong>tutor</strong> - about anything, whenever you want.</p>
         <div className="home-cta">
-          <Link className="btn primary home-start" href="/register/">Create a free account</Link>
-          <Link className="btn" href="/login/">I already have an account</Link>
+          <Button asChild size="lg"><Link href="/register/">Create a free account</Link></Button>
+          <Button asChild size="lg" variant="outline"><Link href="/login/">I already have an account</Link></Button>
         </div>
-        <ul className="home-facts">
-          <li><strong>2</strong><span>languages · English, Slovak</span></li>
-          <li><strong>50</strong><span>course lessons, A1 → B1</span></li>
-          <li><strong>13+</strong><span>conversation topics, and your own</span></li>
-          <li><strong>Live</strong><span>two-way voice, corrected as you speak</span></li>
-        </ul>
+        <Facts catalog={catalog} />
       </section>
 
       <div id="how">
         <TwoWays />
       </div>
       <Courses catalog={catalog} button={(c) => (
-        <button className="btn primary" type="button" onClick={() => router.push(`/register/?learn=${c.name}`)}>
-          {`Learn ${c.name}`}</button>
+        <Button onClick={() => router.push(`/register/?learn=${c.name}`)}>{`Learn ${c.name}`}</Button>
       )} />
       <HowChecked />
       <Beginners />
@@ -57,7 +52,7 @@ function GuestHome() {
       <section className="home-final">
         <h2>Ready to speak?</h2>
         <p className="home-sub">Your own account keeps your level, course, words and mistakes - only yours.</p>
-        <Link className="btn primary home-start" href="/register/">Create a free account</Link>
+        <Button asChild size="lg"><Link href="/register/">Create a free account</Link></Button>
         <p className="home-author">langvis.ai · designed and built by Taleh Rzayev</p>
       </section>
     </main>
@@ -92,10 +87,10 @@ function UserHome() {
           <p className="home-lead">{language ? `You are learning ${language}.` : "Choose a language to begin."}
             {" "}Continue your course, or just talk with your tutor.</p>
           <div className="home-cta welcome-cta">
-            <Link className="btn primary home-start" href="/courses/">Continue my course</Link>
+            <Button asChild size="lg"><Link href="/courses/">Continue my course</Link></Button>
             {/* The Tutor is a page of its own: it is loaded afresh. */}
-            <a className="btn" href="/tutor/">Talk with the Tutor</a>
-            <button className="btn ghost" type="button" onClick={() => setAsk(true)}>Learn another language</button>
+            <Button asChild size="lg" variant="outline"><a href="/tutor/">Talk with the Tutor</a></Button>
+            <Button size="lg" variant="ghost" onClick={() => setAsk(true)}>Learn another language</Button>
           </div>
         </div>
         <ul className="welcome-stats">
@@ -109,8 +104,8 @@ function UserHome() {
       </section>
 
       <Courses catalog={catalog} button={(c) => (
-        <button className="btn primary" type="button" onClick={() => openCourse(c.name, c.key)}>
-          {c.key === current ? "Open my course" : `Learn ${c.name}`}</button>
+        <Button onClick={() => openCourse(c.name, c.key)}>
+          {c.key === current ? "Open my course" : `Learn ${c.name}`}</Button>
       )} />
 
       <LanguageChoiceDialog open={ask} onOpenChange={setAsk} />
@@ -119,6 +114,21 @@ function UserHome() {
 }
 
 // ── Sections ─────────────────────────────────────────────────────────────────
+
+// The numbers under the title: counted from the courses themselves.
+function Facts({ catalog }: { catalog: any }) {
+  const courses: any[] = (catalog && catalog.courses) || [];
+  if (!courses.length) return null;
+  const lessons = courses.reduce((n, c) => n + c.lessons, 0);
+  return (
+    <ul className="home-facts">
+      <li><strong>{courses.length}</strong><span>{`languages · ${courses.map((c) => c.name).join(", ")}`}</span></li>
+      <li><strong>{lessons}</strong><span>course lessons, taught step by step</span></li>
+      <li><strong>{catalog.topics}</strong><span>conversation topics, and your own</span></li>
+      <li><strong>Live</strong><span>two-way voice, corrected as you speak</span></li>
+    </ul>
+  );
+}
 
 function Courses({ catalog, button }: { catalog: any; button: (c: any) => React.ReactNode }) {
   const courses: any[] = (catalog && catalog.courses) || [];

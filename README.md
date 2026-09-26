@@ -11,7 +11,7 @@ and ask about any grammar or word.
 | | |
 |---|---|
 | **Languages** | English · Slovak - switched in the header, each with its own level and progress |
-| **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · English A2 → B1 sentence builder (20 lessons, 4 weeks) |
+| **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · English A2 → B1+ phrasal verbs for daily speaking (20 lessons, 5 weeks) |
 | **Tutor** | free conversation: 13 topics + your own, or free talk; grammar on the board whenever you ask |
 | **Voice** | real-time two-way audio through the Gemini Live API |
 | **Platform** | Python server + any modern browser · Windows, macOS, Linux |
@@ -217,21 +217,22 @@ Translation practice:
 In weeks 1-2 everything is explained in simple English; from week 3 in simple
 Slovak. The board always shows the Azerbaijani translation too.
 
-### The English course: a sentence builder, A2 → B1 in 4 weeks
+### The English course: phrasal verbs for daily speaking, A2 → B1+ in 5 weeks
 
-For a learner who already speaks basic English. One aim: longer, more natural
-sentences. Half the lessons teach **linking words**, half teach **phrasal
-verbs**. Instead of translating, you **build sentences**: join two short ones
-with the lesson's linking word, or swap a plain verb for a phrasal verb.
-
-![Building sentences in the English course](docs/screenshots/13-english-course.png)
+For a learner who already speaks basic English and wants to talk about daily
+life. Every lesson teaches six everyday **phrasal verbs** and shows how to make
+a sentence **grow**: "I wake up." → "I wake up at seven." → "I usually wake up
+at seven on weekdays, but I get up at nine on Sundays." The learner first sees
+one sentence grow part by part (when, where, who with, why, a contrast, a
+result), then **builds** sentences themselves.
 
 | Week | Level | Lessons |
 |---|---|---|
-| **1** · Joining ideas | A2 | and, but, or, so · because and so · first, then, after that · when, before, after, while · also, too, as well |
-| **2** · Everyday phrasal verbs | A2 | My day (wake up, go out) · At home (clean up, put away) · People (get on with, grow up) · Plans (look forward to, put off) · A2 checkpoint story |
-| **3** · Longer sentences | B1 | although, however, despite · if, unless, in case · so that, in order to · who, which, where · as a result, thanks to |
-| **4** · Phrasal verbs for fluent talk | B1 | Work (deal with, figure out) · Problems (break down, come up with) · Feelings (fall out, make up) · Travel (check in, pick up) · B1 final |
+| **1** · My day with phrasal verbs | A2 | Morning (wake up, get up) · Going out (set off, get on) · Evening (come back, tidy up) · Free time (hang out, eat out, stay in) |
+| **2** · People, messages and plans | A2 | Phone (call back, pick up) · Friends (meet up, catch up) · Shopping (look for, try on) · Plans (look forward to, put off) |
+| **3** · Problems, work and stories | B1 | Problems (break down, run out of) · Work (take on, deal with) · Stories (end up, turn out) · Plans change (work out, back out) |
+| **4** · Feelings, habits and advice | B1 | Feelings (cheer up, calm down) · People (fall out, make up) · Habits (give up, cut down on) · Advice (think over, go for) |
+| **5** · Fluent daily speaking | B1+ | Travel (check in, get around) · Discussion (come up with, bring up) · Changes (move on, carry on) · B1+ final story |
 
 Everything is explained in simple English, with the Azerbaijani translation of
 every word and phrase on the board.
@@ -332,20 +333,32 @@ on the board and in the dictionary. Progress is kept separately per language.
 
 ## What is saved
 
-Everything stays on your computer. The accounts (name, email, a scrypt hash of
-the password, sessions) are in the PostgreSQL database of
-`docker-compose.yml`. Everything an account learns is in its own folder,
-`users/u<id>/`, per language (`english/`, `slovak/`), with its `memory/` and
-`settings.json`. The Gemini keys in `config/api_keys.json` are shared by all
-accounts.
+Everything is kept in the PostgreSQL database of `docker-compose.yml` - there
+are no data files. The accounts (name, email, a scrypt hash of the password,
+sessions) and everything an account learns are rows of their own:
+
+| Table | What it holds |
+|---|---|
+| `users` · `sessions` | the accounts and their signed-in browsers |
+| `app_settings` | the Gemini keys, shared by all accounts on this computer |
+| `user_settings` | the account's name, voice and tutor settings |
+| `user_memory` | what LangVis remembers about the learner |
+| `learner_progress` | per language: level, skills, mistakes, dictionary - the source of truth |
+| `learner_reports` | per language: a readable summary, regenerated from the progress |
+| `course_progress` | per language: current lesson, current step, finished lessons |
+| `topic_materials` | each topic's fixed word list and its first lesson |
+| `conversation_lines` | every line of every topic's conversation, and of the course |
 
 There is one microphone and one voice lesson, so one account uses LangVis at a
 time: when another account signs in, the first one's lesson stops (its
-progress is kept) and its tabs say so. The very first account takes over the
-progress made before accounts existed (copied, the old folders stay).
+progress is kept) and its tabs say so.
 
-| File | What it holds |
-|---|---|
+Earlier versions kept JSON files (`users/u<id>/`, `english/`, `slovak/`,
+`memory/long_term.json`, `config/api_keys.json`). On start they are moved into
+the database once and deleted; the very first account takes over the progress
+made before accounts existed.
+
+---|---|
 | `level.json` | level, skills, mistakes, course position, dictionary - the source of truth |
 | `progress.md` | a readable summary, regenerated from `level.json` |
 | `intensive.json` | the course: current lesson, current step, finished lessons |
@@ -375,13 +388,14 @@ web/
 core/
   live.py                   the Gemini Live session: turns, thinking, voice, echo
   prompt.txt                the teacher's core instructions
+  store.py                  every piece of data, in PostgreSQL
   plugin_loader.py · selflog.py
 
 tutor/
   curriculum.py             English skills, rules, stages; the languages
   slovak.py                 Slovak skills, rules and stages
   intensive_slovak.py       the Slovak course: 30 lessons, A1 → B1
-  intensive_english.py      the English sentence builder: 20 lessons, A2 → B1
+  intensive_english.py      the English course: phrasal verbs for daily speaking, 20 lessons, A2 → B1+
   topics.py                 topics, their dictionaries and first lessons
   progress.py               learner state: level, skills, course, dictionary
   analysis.py               transcription and per-sentence analysis
@@ -390,7 +404,7 @@ plugins/
   language_tutor.py         the teacher: taught steps, courses, correct → enrich → record
 
 docs/                       logo.png and screenshots/ - the pictures in this file
-memory/ · config/           settings, memory and your local API key
+memory/                     settings and memory (stored through core/store.py)
 ```
 
 ---
@@ -426,8 +440,8 @@ tool the tutor can call. Start from `plugins/_template.py`.
   used up, the next model takes over; when all are spent, the board says why
   the tutor is quiet.
 - The server listens on `127.0.0.1` only, and only its own page may connect.
-- Your API key, settings, memory and all progress files stay on your computer
-  and are git-ignored. Audio is sent only to the Gemini API during a lesson.
+- Your API key, settings, memory and all progress stay on your computer, in
+  the local database. Audio is sent only to the Gemini API during a lesson.
 
 ---
 
