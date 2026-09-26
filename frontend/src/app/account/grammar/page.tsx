@@ -4,6 +4,7 @@
 // what you say. Click a rule for its explanation and your own mistakes.
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLive } from "@/components/live-provider";
 import { getJson } from "@/lib/api";
@@ -28,7 +29,7 @@ export default function GrammarPage() {
     <main className="page doc" id="page-grammar">
       <div className="doc-head doc-head-row">
         <div>
-          <Link className="back-link" href="/account/">← Account</Link>
+          <Link className="back-link" href="/account/"><ArrowLeft className="size-4" />Account</Link>
           <h1>Grammar</h1>
           <p className="sub">Every grammar rule from A1 to B2 and how well you know it - measured from what you say. Click one to see your own mistakes and the rule.</p>
         </div>

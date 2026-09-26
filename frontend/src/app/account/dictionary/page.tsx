@@ -4,6 +4,7 @@
 // different days it was used. Click a row for your own sentences with it.
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,7 +74,7 @@ export default function DictionaryPage() {
   return (
     <main className="page doc" id="page-dictionary">
       <div className="doc-head">
-        <Link className="back-link" href="/account/">← Account</Link>
+        <Link className="back-link" href="/account/"><ArrowLeft className="size-4" />Account</Link>
         <h1>Dictionary</h1>
         <p className="sub">{failed ? "The dictionary could not be loaded."
           : "Every word and phrase you met. Nothing is forgotten: each one comes back on its review day, in whatever topic you are in."}</p>

@@ -845,7 +845,7 @@ body[data-page="lesson"] .course-side {
 .brand-logo { height: 32px; width: auto; display: block; }
 .doc-head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .head-actions { display: flex; gap: 8px; }
-.back-link { display: inline-block; font-size: 13px; color: var(--ink-med); text-decoration: none; margin-bottom: 4px; }
+.back-link { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-med); text-decoration: none; margin-bottom: 4px; }
 .back-link:hover { color: var(--pri); }
 #page-grammar .syllabus { margin-top: 12px; }
 @media (max-width: 560px) { .brand-logo { height: 26px; } }

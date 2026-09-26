@@ -5,7 +5,7 @@
 // menu (settings, sign out) on the right.
 
 import Link from "next/link";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, FilePenLine, LogOut, Pencil, Plus, X } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -123,10 +123,10 @@ function UserMenu({ onSettings }: { onSettings: () => void }) {
           <div className="text-xs text-muted-foreground truncate">{user.email}</div>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild><Link href="/account/"><UserIcon className="nav-icon" />My progress</Link></DropdownMenuItem>
-        <DropdownMenuItem onSelect={onSettings}><span className="nav-icon inline-grid"><GearIcon /></span>Settings</DropdownMenuItem>
+        <DropdownMenuItem asChild><Link href="/account/" className="no-underline!"><UserIcon className="nav-icon" />My progress</Link></DropdownMenuItem>
+        <DropdownMenuItem onSelect={onSettings}><GearIcon className="nav-icon" />Settings</DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => { logout(); }}>Log out</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { logout(); }}><LogOut className="nav-icon" />Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -152,7 +152,7 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
       <Button variant="ghost" size="icon-sm" type="button" aria-label={`Scenario for ${t.name}`}
               title={t.prompt ? `Scenario: ${t.prompt}` : "Add a scenario for this topic"}
               onClick={(e) => { e.stopPropagation(); onOwn(t); }}>
-        {t.prompt ? "✎•" : "✎"}
+        {t.prompt ? <FilePenLine /> : <Pencil />}
       </Button>
       {t.started && t.id !== "free" && (
         <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
@@ -162,7 +162,7 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
                   if (confirm(`Delete the topic "${t.name}"? Its words stay in your dictionary.`)) {
                     send({ type: "delete_topic", id: t.id });
                   }
-                }}>✕</Button>
+                }}><X /></Button>
       )}
     </div>
   );
@@ -190,7 +190,7 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
           </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-primary font-semibold" onSelect={() => onOwn(null)}>+ My own topic…</DropdownMenuItem>
+        <DropdownMenuItem className="text-primary font-semibold" onSelect={() => onOwn(null)}><Plus />My own topic…</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

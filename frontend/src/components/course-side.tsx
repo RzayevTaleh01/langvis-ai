@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { Check } from "lucide-react";
 import { useLive } from "@/components/live-provider";
 
 export function CourseSide() {
@@ -37,7 +38,7 @@ export function CourseSide() {
             return (
               <li key={sec.kind} className={here ? "here" : past ? "past" : ""}>
                 <span>{sec.label}</span>
-                <span className="cs-count">{here ? `${it.step - sec.start + 1}/${sec.count}` : past ? "✓" : `${sec.count}`}</span>
+                <span className="cs-count">{here ? `${it.step - sec.start + 1}/${sec.count}` : past ? <Check className="size-3.5" aria-label="done" /> : `${sec.count}`}</span>
               </li>
             );
           })}
@@ -56,7 +57,7 @@ export function CourseSide() {
                         if (live.started) live.send({ type: "intensive_lesson", index: l.index });
                         else live.begin({ lesson: l.index });
                       }}>
-                <span className="cs-num">{l.state === "done" ? "✓" : `${l.index + 1}`}</span>
+                <span className="cs-num">{l.state === "done" ? <Check className="size-3.5" aria-label="done" /> : `${l.index + 1}`}</span>
                 <span>{l.title}</span>
               </button>
             ))}
