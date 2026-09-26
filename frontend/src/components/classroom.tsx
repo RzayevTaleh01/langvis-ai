@@ -104,7 +104,8 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
 
         <div className="block hidden" id="fixed-block">
           <div className="label">Corrected - say it</div>
-          <p className="sentence fixed" id="fixed" />
+          {/* Not "fixed": that is Tailwind's position: fixed, and it tore the sentence off the board. */}
+          <p className="sentence corrected" id="fixed" />
           <ol className="fixes" id="fixes" />
         </div>
 

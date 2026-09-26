@@ -252,7 +252,7 @@ body[data-muted="true"] .state-pill { background: var(--bad-ghost); color: var(-
 .tok.bad { color: var(--bad); text-decoration: underline wavy var(--bad); text-underline-offset: 5px; cursor: pointer; }
 .tok .n { font: 600 11px var(--ui); color: var(--bad); margin-left: 2px; vertical-align: super; line-height: 0; }
 .tok.good { color: var(--good); background: var(--good-ghost); }
-.sentence.fixed { font-size: 20px; }
+.sentence.corrected { font-size: 20px; }
 .sentence.better { font-size: 20px; color: var(--pri); }
 .sentence .new {
   background: var(--pri-ghost); border-bottom: 2px solid var(--pri);
@@ -733,7 +733,7 @@ textarea.input { width: 100%; resize: vertical; font: 15px/1.45 var(--ui); }
   .unit-row .meter { display: none; }
   .board { padding: 14px 14px 30px calc(var(--tutor) + 14px); }
   .sentence { font-size: 19px; }
-  .sentence.fixed, .sentence.better { font-size: 20px; }
+  .sentence.corrected, .sentence.better { font-size: 20px; }
   .bubble { max-width: 200px; font-size: 13px; }
   .nav a { padding: 6px 8px; }
 }
