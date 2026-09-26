@@ -226,7 +226,7 @@ body[data-state="THINKING"] .state-pill { background: var(--think-ghost); color:
 body[data-state="SLEEPING"] .state-pill { background: var(--panel-2); color: var(--ink-med); }
 body[data-muted="true"] .state-pill { background: var(--bad-ghost); color: var(--bad); }
 
-.block { margin-bottom: 12px; transition: padding-bottom .35s ease; }
+.board .block { margin-bottom: 12px; transition: padding-bottom .35s ease; }
 /* The gap that opens under the line the tutor explains, for it to stand in. */
 .tutor-lane { display: block; list-style: none; height: 0; transition: height .35s ease; }
 .tutor-lane.open { height: calc(var(--tutor) + 10px); }
@@ -738,7 +738,7 @@ textarea.input { width: 100%; resize: vertical; font: 15px/1.45 var(--ui); }
   .nav a { padding: 6px 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tutor, .block { transition: none; }
+  .tutor, .board .block { transition: none; }
   .tutor .face { animation: none; }
 }
 

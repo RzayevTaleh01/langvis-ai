@@ -1,9 +1,8 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Courses: the course of the language being learned, laid out like a course
-// page - what it is and what you will learn, the whole syllabus week by week
-// (every lesson with its parts, words and grammar), and on the right the
-// lesson to do now with the way into it.
+// Courses: the course of the language being learned - your progress with the
+// lesson to do now, and the whole syllabus week by week (every lesson with its
+// parts, words and grammar).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -58,115 +57,65 @@ function Course({ data, open }: { data: any; open: Open }) {
   const cur = lessons[data.current];
   const going = data.step > 0;
   const pct = Math.round((100 * data.done) / Math.max(1, data.total));
-  const steps = lessons.reduce((n, l) => n + (l.steps || 0), 0);
   const allWeeks = data.weeks.map((w: any) => `week-${w.week}`);
   const [openWeeks, setOpenWeeks] = useState<string[]>([`week-${cur.week}`]);
   const allOpen = openWeeks.length === allWeeks.length;
 
   return (
-    <>
-      <section className="cp-hero">
-        <div className="cp-hero-inner">
-          <nav className="cp-crumbs" aria-label="Breadcrumb">
-            <span>Courses</span><span aria-hidden="true">›</span><span>{data.language}</span>
-          </nav>
-          <h1>{data.title}</h1>
-          {data.about && <p className="cp-about">{data.about}</p>}
-          <div className="cp-meta">
-            <span className="cp-level">{data.levels}</span>
-            <span>{`${data.weeks.length} weeks`}</span>
-            <span>{`${data.total} lessons`}</span>
-            <span>{`${data.words_total} words and phrases`}</span>
-            <span>Explained in simple English · Azerbaijani on the board</span>
+    <div className="cp-wrap">
+      <div className="cp-head">
+        <h1>{data.title}</h1>
+        <p>{`${data.weeks.length} weeks · ${data.total} lessons`}</p>
+      </div>
+
+      <section className="cp-card">
+        <div className="cp-progress">
+          <div className="cp-progress-row"><span>Your progress</span><strong>{`${data.done} of ${data.total} lessons · ${pct}%`}</strong></div>
+          <div className="int-bar"><span style={{ width: `${pct}%` }} /></div>
+        </div>
+        <div className="cp-now-row">
+          <div className="cp-now-text">
+            <div className="cp-card-kicker">{going ? "Continue where you stopped" : data.done ? "Next lesson" : "Start here"}</div>
+            <div className="cp-card-title">{`Lesson ${cur.index + 1}: ${cur.title}`}</div>
+            {going && <p className="int-step">{`Step ${data.step + 1} of ${data.steps}`}</p>}
           </div>
+          <Button size="lg" onClick={() => open({ track: "intensive" })}>
+            <PlayIcon />{going ? "Continue the lesson" : "Start the lesson"}
+          </Button>
         </div>
       </section>
 
-      <div className="cp-body">
-        <div className="cp-main">
-          {data.outcomes?.length > 0 && (
-            <section className="cp-learn">
-              <h2>What you&apos;ll learn</h2>
-              <ul>
-                {data.outcomes.map((o: string) => (
-                  <li key={o}><CheckIcon className="size-4 shrink-0 text-primary" /><span>{o}</span></li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <section className="cp-content">
-            <div className="cp-content-head">
-              <div>
-                <h2>Course content</h2>
-                <p>{`${data.weeks.length} sections · ${data.total} lessons · ${steps} steps`}</p>
-              </div>
-              <Button variant="link" size="sm"
-                      onClick={() => setOpenWeeks(allOpen ? [] : allWeeks)}>
-                {allOpen ? "Collapse all sections" : "Expand all sections"}
-              </Button>
-            </div>
-
-            <Accordion type="multiple" value={openWeeks} onValueChange={setOpenWeeks} className="cp-sections">
-              {data.weeks.map((wk: any) => {
-                const inWeek = lessons.filter((l) => l.week === wk.week);
-                const done = inWeek.filter((l) => l.state === "done").length;
-                return (
-                  <AccordionItem key={wk.week} value={`week-${wk.week}`} className="cp-section">
-                    <AccordionTrigger className="cp-section-head">
-                      <span className="cp-section-title">
-                        <strong>{`Week ${wk.week}: ${wk.title}`}</strong>
-                        <span className="badge lvl">{wk.band}</span>
-                      </span>
-                      <span className="cp-section-meta">
-                        {`${done}/${inWeek.length} done · ${inWeek.reduce((n, l) => n + (l.steps || 0), 0)} steps`}
-                      </span>
-                    </AccordionTrigger>
-                    <AccordionContent className="cp-section-body">
-                      <ol className="cp-lessons">
-                        {inWeek.map((l) => <LessonRow key={l.index} l={l} open={open} />)}
-                      </ol>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          </section>
+      <section className="cp-content">
+        <div className="cp-content-head">
+          <h2>Syllabus</h2>
+          <Button variant="link" size="sm" onClick={() => setOpenWeeks(allOpen ? [] : allWeeks)}>
+            {allOpen ? "Collapse all" : "Expand all"}
+          </Button>
         </div>
-
-        <aside className="cp-side">
-          <div className="cp-card">
-            <div className="cp-card-kicker">{going ? "Continue where you stopped" : data.done ? "Next lesson" : "Start here"}</div>
-            <div className="cp-card-title">{`Lesson ${cur.index + 1}: ${cur.title}`}</div>
-            <p className="cp-card-goal">{`After it you can ${cur.goal}.`}</p>
-            {going && (
-              <>
-                <div className="int-bar"><span style={{ width: `${Math.round((100 * data.step) / Math.max(1, data.steps))}%` }} /></div>
-                <p className="int-step">{`Step ${data.step + 1} of ${data.steps}`}</p>
-              </>
-            )}
-            <Button size="lg" className="w-full" onClick={() => open({ track: "intensive" })}>
-              <PlayIcon />{going ? "Continue the lesson" : "Start the lesson"}
-            </Button>
-            <div className="cp-progress">
-              <div className="cp-progress-row"><span>Your progress</span><strong>{`${pct}%`}</strong></div>
-              <div className="int-bar"><span style={{ width: `${pct}%` }} /></div>
-              <p>{`${data.done} of ${data.total} lessons done`}</p>
-            </div>
-            <div className="cp-includes">
-              <strong>This course includes</strong>
-              <ul>
-                <li>{`${data.total} voice lessons with a teacher`}</li>
-                <li>{`${data.words_total} words and phrases with translations`}</li>
-                <li>Every sentence checked and corrected</li>
-                <li>A dialogue, sentence building and questions in every lesson</li>
-                <li>Your place kept to the exact step</li>
-              </ul>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </>
+        <Accordion type="multiple" value={openWeeks} onValueChange={setOpenWeeks} className="cp-sections">
+          {data.weeks.map((wk: any) => {
+            const inWeek = lessons.filter((l) => l.week === wk.week);
+            const done = inWeek.filter((l) => l.state === "done").length;
+            return (
+              <AccordionItem key={wk.week} value={`week-${wk.week}`} className="cp-section">
+                <AccordionTrigger className="cp-section-head">
+                  <span className="cp-section-title">
+                    <strong>{`Week ${wk.week}: ${wk.title}`}</strong>
+                    <span className="badge lvl">{wk.band}</span>
+                  </span>
+                  <span className="cp-section-meta">{`${done}/${inWeek.length} done`}</span>
+                </AccordionTrigger>
+                <AccordionContent className="cp-section-body">
+                  <ol className="cp-lessons">
+                    {inWeek.map((l) => <LessonRow key={l.index} l={l} open={open} />)}
+                  </ol>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      </section>
+    </div>
   );
 }
 
