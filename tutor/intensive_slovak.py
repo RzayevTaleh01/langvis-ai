@@ -1645,6 +1645,61 @@ LESSONS += [
     ),
 ]
 
+# Words the lesson's sentences use beyond its own lists - taught together with
+# its words, so the learner never has to say a word nobody has taught them.
+MORE_WORDS: dict[str, list[tuple[str, str, str]]] = {
+    "sk-i01": [("A ty?", "And you?", "Bəs sən?"), ("Aj ja.", "Me too.", "Mən də."),
+               ("Aj mňa teší.", "Nice to meet you too.", "Mən də şadam.")],
+    "sk-i02": [("sme", "we are", "biz ...-ıq")],
+    "sk-i03": [("nula", "zero", "sıfır")],
+    "sk-i05": [("vo firme", "in a company", "şirkətdə")],
+    "sk-i06": [("raňajkovať / raňajkujem", "to have breakfast / I have breakfast", "səhər yeməyi yemək / yeyirəm")],
+    "sk-i07": [("piť / pijem", "to drink / I drink", "içmək / içirəm")],
+    "sk-i08": [("kupovať / kupujem", "to buy / I buy", "almaq / alıram"),
+               ("Nech sa páči.", "Here you are.", "Buyurun.")],
+    "sk-i09": [("nebývam", "I don't live", "yaşamıram")],
+    "sk-i10": [("ale", "but", "amma"), ("jesť / jem", "to eat / I eat", "yemək / yeyirəm")],
+    "sk-i11": [("jedol som", "I ate", "yedim"), ("poobede", "in the afternoon", "günortadan sonra"),
+               ("v sobotu", "on Saturday", "şənbə günü"), ("sme", "we are / we (did)", "biz")],
+    "sk-i12": [("kopec", "hill", "təpə"), ("do Tatier", "to the Tatras", "Tatra dağlarına")],
+    "sk-i13": [("tam", "there", "orada"), ("učiť sa", "to learn, to study", "öyrənmək")],
+    "sk-i14": [("malý / malá", "small", "kiçik"), ("pekný", "nice", "gözəl"), ("v izbe", "in the room", "otaqda"),
+               ("len", "only", "yalnız"), ("dosť", "enough, quite", "kifayət qədər, xeyli")],
+    "sk-i15": [("keď", "when", "-anda, nə vaxt ki"), ("mal som", "I had", "məndə var idi"),
+               ("v piatok", "on Friday", "cümə günü")],
+    "sk-i17": [("veľa koncoviek", "a lot of endings", "çoxlu şəkilçi")],
+    "sk-i18": [("oveľa", "much (bigger, better)", "xeyli, çox"), ("viac", "more", "daha çox"),
+               ("zeleň", "greenery, parks", "yaşıllıq"), ("život", "life", "həyat")],
+    "sk-i19": [("mame", "to mum", "anama")],
+    "sk-i20": [("kvôli", "because of", "... görə"), ("sem", "here (to here)", "bura")],
+    "sk-i21": [("bryndzové halušky", "halušky with sheep cheese", "qoyun pendirli halušky"),
+               ("leto", "summer", "yay"), ("v Nemecku / v Turecku", "in Germany / in Turkey", "Almaniyada / Türkiyədə"),
+               ("práve", "just, right now", "məhz, təzəcə"), ("veľmi", "very", "çox"), ("ich", "them", "onları")],
+    "sk-i22": [("mohol by som", "I could", "bilərdim")],
+    "sk-i23": [("Rob to tak.", "Do it like this.", "Belə et."), ("skôr", "earlier, rather", "daha tez"),
+               ("prejsť", "to go through, to walk across", "keçmək")],
+    "sk-i24": [("z Nitry", "from Nitra", "Nitradan"), ("sedí pri okne", "sits by the window", "pəncərənin yanında oturur")],
+    "sk-i25": [("aplikácia", "app", "tətbiq"), ("nová / novej", "new", "yeni"), ("patriť", "to belong", "aid olmaq"),
+               ("vaša firma", "your company (polite)", "sizin şirkətiniz"), ("viem", "I know", "bilirəm"),
+               ("o tom", "about it", "bu barədə"), ("aj", "also, too", "də, həm də")],
+    "sk-i26": [("notebook", "laptop", "noutbuk")],
+    "sk-i27": [("benzín", "petrol", "benzin"), ("otvorila sa", "(it) opened", "açıldı")],
+    "sk-i28": [("fotky", "photos", "fotolar"), ("zmluva / zmluvu", "contract", "müqavilə"),
+               ("musel som", "I had to", "məcbur oldum"), ("najťažšie", "the hardest", "ən çətini"),
+               ("rady", "queues", "növbələr"), ("dlhé", "long", "uzun")],
+    "sk-i29": [("jar / na jari", "spring / in spring", "yaz / yazda"), ("kapustnica", "cabbage soup (Christmas)", "kələm şorbası"),
+               ("najväčší", "the biggest", "ən böyük"), ("s nami", "with us", "bizimlə"),
+               ("obľúbený", "favourite", "sevimli"), ("piecť / pečieme", "to bake / we bake", "bişirmək (sobada)"),
+               ("začiatok", "beginning", "başlanğıc")],
+    "sk-i30": [("byty", "flats", "mənzillər"), ("Chýbajú mi.", "I miss them.", "Onlar üçün darıxıram."),
+               ("domov / domu", "home (to home)", "evə"), ("hluk", "noise", "səs-küy"),
+               ("kolegovia", "colleagues", "həmkarlar"), ("pohodlný / pohodlné", "comfortable", "rahat"),
+               ("radšej", "rather", "daha çox"), ("všetko", "everything", "hər şey")],
+}
+for _l in LESSONS:
+    _l["words"] += _items(MORE_WORDS.get(_l["id"], []))
+
+
 COURSE = {
     "id": "slovak_intensive",
     "language": "slovak",

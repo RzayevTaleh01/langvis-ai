@@ -55,8 +55,13 @@ ECHO_TAIL = 2.5                   # s after it ends: a sentence starting now is 
 OPENING_WAIT = 25.0               # s the mic waits at most for the greeting to be spoken
 SEND_CHUNK = 4096                 # bytes per audio message when a finished sentence is sent
 REPLY_WAIT = 8.0                  # s the mic stays closed while the released reply arrives
-GATE_TIMEOUT = 14.0               # s of thinking before the tutor is let answer on its own
+GATE_TIMEOUT = 10.0               # s of thinking before the tutor is let answer on its own
 ECHO_GAP = 0.9                    # s after the tutor's voice ends: a sentence starting later is the learner
+REACT_GAP = 0.3                   # s: nobody answers faster - a repeat starting sooner may be the echo
+# Hearing starts during the pause that may end the sentence: after this share
+# of the end silence (never under EARLY_MIN s) the check is already running.
+EARLY_SHARE = 0.45
+EARLY_MIN = 0.5
 
 
 _key_turn = 0      # which key the voice session uses: the next after a spent one
@@ -251,6 +256,10 @@ class _Vad:
     def __init__(self) -> None:
         self.reset()
 
+    TAIL_KEEP = 5             # quiet blocks kept after the last word when it is sent to be heard
+
+    seq = 0                   # counts sentences: an early hearing belongs to one of them
+
     def reset(self) -> None:
         self.active = False
         self._loud = 0
@@ -258,6 +267,26 @@ class _Vad:
         self._before: deque[bytes] = deque(maxlen=self.PREROLL)
         self._chunks: list[bytes] = []
         self._speech = 0.0
+        self._last_loud = -1
+
+    @property
+    def quiet(self) -> float:
+        """Seconds of quiet since the last word of the sentence being heard."""
+        return self._quiet if self.active else 0.0
+
+    @property
+    def speech(self) -> float:
+        return self._speech
+
+    def key(self) -> tuple[int, int]:
+        """This sentence up to its last word: the same key at the end means
+        nothing was said after an early hearing started."""
+        return self.seq, self._last_loud
+
+    def spoken(self) -> bytes:
+        """The sentence without the long silence that ended it - what the
+        checker hears. Less to upload, the same words."""
+        return b"".join(self._chunks[:self._last_loud + 1 + self.TAIL_KEEP])
 
     def feed(self, samples: np.ndarray, barge: bool = False) -> str | None:
         """'start', 'end' or None. `barge`: the tutor is speaking, so starting
@@ -271,7 +300,9 @@ class _Vad:
             self._loud = self._loud + 1 if level >= start_level else 0
             if self._loud >= need:
                 self.active = True
+                _Vad.seq += 1
                 self._chunks = list(self._before) + [block]
+                self._last_loud = len(self._chunks) - 1
                 self._quiet = 0.0
                 self._speech = self.BLOCK_SECONDS * self._loud
                 return "start"
@@ -283,6 +314,7 @@ class _Vad:
         else:
             self._quiet = 0.0
             self._speech += self.BLOCK_SECONDS
+            self._last_loud = len(self._chunks) - 1
         total = len(self._chunks) * self.BLOCK_SECONDS
         if self._quiet >= self.END_SILENCE or total >= self.MAX_SECONDS:
             return "end"
@@ -292,11 +324,12 @@ class _Vad:
         """Everything heard so far, from just before the start."""
         return list(self._chunks)
 
-    def take(self) -> tuple[bytes, float]:
-        """The finished sentence and how much of it was actual speech."""
-        data, speech = b"".join(self._chunks), self._speech
+    def take(self) -> tuple[bytes, bytes, float, tuple[int, int]]:
+        """The finished sentence (all of it, and without its long tail), how
+        much of it was actual speech, and its key."""
+        data, spoken, speech, key = b"".join(self._chunks), self.spoken(), self._speech, self.key()
         self.reset()
-        return data, speech
+        return data, spoken, speech, key
 
 
 class LiveSession:
@@ -319,6 +352,10 @@ class LiveSession:
         # means a dropped connection does not restart the lesson. RAM only: a
         # fresh launch begins a new lesson, which also writes the summary.
         self._resume_handle: str | None = None
+        # Which session may keep a handle: one that is closing (Stop, another
+        # page) can still receive one, and a new lesson must never resume it.
+        self._session_token: object | None = None
+        self._session_label = ""       # "English" (the Tutor) or "English · course": its own recaps
         self._turn_done_event: asyncio.Event | None = None
         self._lesson_started   = False
         self._new_topic        = False   # the next opening starts a topic just chosen
@@ -342,6 +379,10 @@ class LiveSession:
         self._tutor_text = ""          # what the tutor said lately - to recognise its echo
         self._turn_spoke = False       # the tutor's current turn has already made a sound
         self._drop_rest = False        # a tool call ended a spoken turn: the rest is not said
+        self._early_key = None         # the sentence an early hearing was started for
+        self._timing: dict | None = None   # when this turn's steps happened, for the speed log
+        self._live_thinking = True     # the voice model is asked to think little (off if it refuses)
+        self._connect_fails = 0        # connections in a row that failed before "Connected"
 
         # The tutor only ever speaks when it was asked to: after the learner's
         # sentence, a system note that wants a reply, or the lesson opening. A
@@ -539,9 +580,31 @@ class LiveSession:
             return
         if event == "end":
             self.ui.send({"type": "hearing", "value": False})
-            utterance, seconds = self._vad.take()
+            utterance, spoken, seconds, key = self._vad.take()
+            early = key if key == self._early_key else None
+            self._early_key = None
+            self._timing = {"end": now, "early": early is not None}
             self._gate_task = asyncio.get_running_loop().create_task(
-                self._think_then_answer(utterance, seconds))
+                self._think_then_answer(utterance, seconds, spoken, early))
+            return
+        self._maybe_hear_early()
+
+    def _maybe_hear_early(self) -> None:
+        """The learner has paused long enough that this may be the end of the
+        sentence: start hearing it now. If they go on, it is thrown away."""
+        vad = self._vad
+        if not vad.active or vad.speech < 0.3:
+            return
+        if vad.quiet < max(EARLY_MIN, vad.END_SILENCE * EARLY_SHARE) or vad.key() == self._early_key:
+            return
+        prehear = plugin_fn("prehear")
+        if prehear is None:
+            return
+        self._early_key = vad.key()
+        try:
+            prehear(self._early_key, vad.spoken(), vad.speech)
+        except Exception as e:
+            print(f"[LangVis] early hearing failed: {e}")
 
     def _queue(self, msg: dict) -> None:
         """Audio, activity markers and notes share one queue, so they reach the
@@ -566,9 +629,12 @@ class LiveSession:
                 await self.session.send_realtime_input(
                     audio=types.Blob(data=msg["data"], mime_type="audio/pcm;rate=16000"))
 
-    async def _think_then_answer(self, utterance: bytes, seconds: float) -> None:
+    async def _think_then_answer(self, utterance: bytes, seconds: float,
+                                 spoken: bytes | None = None, early=None) -> None:
         """Hold the tutor's turn while the sentence is checked, then release it
-        with the reply decided."""
+        with the reply decided. `spoken` is the sentence without its long end
+        silence (what the checker hears); `early` the key of an early hearing
+        of it that is already running."""
         gate = plugin_fn("gate_audio")
         note, handled = None, False
         if seconds < 0.3:
@@ -580,8 +646,8 @@ class LiveSession:
                 # The echo is judged inside the gate, BEFORE the lesson moves on;
                 # past the deadline the gate changes nothing.
                 decided = await asyncio.wait_for(
-                    asyncio.to_thread(gate, utterance, seconds, self.ui, self._echo_of,
-                                      time.monotonic() + GATE_TIMEOUT - 0.5),
+                    asyncio.to_thread(gate, spoken or utterance, seconds, self.ui, self._echo_of,
+                                      time.monotonic() + GATE_TIMEOUT - 0.5, early),
                     timeout=GATE_TIMEOUT) or {}
                 if decided.get("drop"):
                     # Nothing was said - noise, or the tutor's own voice.
@@ -606,9 +672,16 @@ class LiveSession:
                     self._session_log.append(f"Learner: {heard}")
                     self._you_logged = True
             except asyncio.TimeoutError:
-                print("[LangVis] thinking took too long - the tutor answers on its own")
+                print("[LangVis] thinking took too long - the tutor answers what it heard")
+                late = plugin_fn("late_note")
+                try:
+                    note = late() if late is not None else None
+                except Exception:
+                    note = None
             except Exception as e:
                 print(f"[LangVis] thinking failed: {e}")
+        if self._timing is not None:
+            self._timing["checked"] = time.monotonic()
         self._gated_turn = handled
         self.ui.hold_live = handled         # the board already shows the sentence
         # The whole sentence goes to the model at once, with the decided reply.
@@ -627,6 +700,15 @@ class LiveSession:
         repeating "Say it: prosím" starts later - and says the same words."""
         if not self._utt_barge or self._utt_gap >= ECHO_GAP:
             return False
+        if self._utt_gap >= REACT_GAP:
+            # Started after the tutor's voice ended, and it is exactly what the
+            # learner was asked to say: a quick repeat, not the echo.
+            repeat = plugin_fn("expects_repeat")
+            try:
+                if repeat is not None and repeat(heard):
+                    return False
+            except Exception:
+                pass
         return self._is_echo(heard)
 
     def _is_echo(self, heard: str) -> bool:
@@ -744,6 +826,10 @@ class LiveSession:
                 sliding_window=types.SlidingWindow()),
             speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(
                 prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=get_voice()))),
+            # The reply is decided before it is released ([NEXT]): the voice
+            # model only has to say it, so it starts speaking without thinking.
+            thinking_config=(types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
+                             if self._live_thinking else None),
             # The server decides when the learner's turn ends - see feed_mic.
             realtime_input_config=types.RealtimeInputConfig(
                 automatic_activity_detection=types.AutomaticActivityDetection(disabled=True)),
@@ -782,16 +868,17 @@ class LiveSession:
         print(f"[LangVis] 📤 {name} → {' '.join(str(result).split())[:80]}")
         return types.FunctionResponse(id=fc.id, name=name, response={"result": result})
 
-    async def _receive(self):
+    async def _receive(self, token: object | None = None):
         out_buf, in_buf = [], []
         while True:
             async for response in self.session.receive():
 
                 # `resumable` goes false while a turn is mid-flight; only
-                # resumable handles are kept.
+                # resumable handles are kept - and only by the lesson that is
+                # still running, never by one that is closing.
                 sru = getattr(response, "session_resumption_update", None)
                 if sru is not None and getattr(sru, "resumable", False) \
-                        and getattr(sru, "new_handle", None):
+                        and getattr(sru, "new_handle", None) and token is self._session_token:
                     self._resume_handle = sru.new_handle
 
                 # GoAway: leave on our own terms, with the handle armed.
@@ -813,6 +900,7 @@ class LiveSession:
                 silent = silent or self._drop_rest
                 if response.data and not silent:
                     self._turn_spoke = True
+                    self._log_speed()
                 if response.data and not self._interrupted and not silent:
                     if self._turn_done_event and self._turn_done_event.is_set():
                         self._turn_done_event.clear()
@@ -892,6 +980,17 @@ class LiveSession:
                         self._expect_reply()      # the answer comes after the tool
                     await self.session.send_tool_response(function_responses=responses)
 
+    def _log_speed(self) -> None:
+        """Once per turn: how long the learner waited, step by step."""
+        t = self._timing
+        if not t or "checked" not in t:
+            return
+        self._timing = None
+        now = time.monotonic()
+        print(f"[Speed] silence->checked {t['checked'] - t['end']:.1f}s"
+              f"{' (early)' if t.get('early') else ''} · checked->voice {now - t['checked']:.1f}s"
+              f" · total {now - t['end']:.1f}s after the pause")
+
     async def _play(self):
         """Release the tutor's voice to the browser at speaking speed, so the
         server knows when it is speaking and Interrupt can stop it."""
@@ -940,8 +1039,8 @@ class LiveSession:
 
         new_topic, self._new_topic = self._new_topic, False
         # A topic just chosen is a new conversation: no recap of the last one.
-        language = _plugin_value("language_name", "English")
-        last = None if new_topic else await asyncio.to_thread(pop_last_session, language)
+        # The Tutor recaps Tutor lessons only, a course its own lessons.
+        last = None if new_topic else await asyncio.to_thread(pop_last_session, self._session_label)
         recap = ""
         if last:
             try:
@@ -995,7 +1094,7 @@ class LiveSession:
             turns={"role": "user", "parts": [{"text": prompt}]}, turn_complete=True)
         self.ui.write_log("SYS: Lesson started.")
 
-    async def _save_session_summary(self, owner: int | None) -> None:
+    async def _save_session_summary(self, owner: int | None, label: str = "") -> None:
         """One or two sentences about this lesson, for the next one to open on.
         `owner` is the account the lesson belonged to: if another account has
         signed in meanwhile, the summary is not written into its memory."""
@@ -1012,7 +1111,7 @@ class LiveSession:
                                            model="gemini-flash-lite-latest", contents=prompt)
             summary = (getattr(resp, "text", "") or "").strip()
             if summary and profile.current() == owner:
-                save_session_summary(summary[:280], _plugin_value("language_name", "English"))
+                save_session_summary(summary[:280], label or _plugin_value("language_name", "English"))
         except Exception as e:
             print(f"[Memory] ⚠️ Lesson summary failed: {e}")
 
@@ -1030,6 +1129,7 @@ class LiveSession:
         self._lesson_started = False
         self._new_topic = False
         self._resume_handle = None
+        self._session_token = None      # the closing session keeps no handle
         self._vad.reset()
 
     async def run(self):
@@ -1038,9 +1138,16 @@ class LiveSession:
         self._stopping = False
         set_trim_notifier(self.ui.write_log)
         owner = profile.current()
+        # Start was pressed: a NEW lesson. Nothing of the one before it (the
+        # course lesson left on another page) may be resumed.
+        self._resume_handle = None
+        token = self._session_token = object()
+        self._session_label = str(_plugin_value("session_label", "")
+                                  or _plugin_value("language_name", "English"))
 
         while True:
             resumed = self._resume_handle is not None
+            connected = False
             try:
                 print("[LangVis] Connecting...")
                 self.ui.set_state("THINKING")
@@ -1060,6 +1167,8 @@ class LiveSession:
                     self._reply_pending = False
                     self._turn_state = None
                     print("[LangVis] Connected.")
+                    connected = True
+                    self._connect_fails = 0
                     # A new lesson: the tutor speaks first, so it is not the
                     # learner's turn yet.
                     self.ui.set_state("THINKING" if not self._lesson_started else "LISTENING")
@@ -1068,7 +1177,7 @@ class LiveSession:
                     self._reconnect_event.clear()   # ignore requests from before this session
                     tg.create_task(self._watch_reconnect())
                     tg.create_task(self._send_realtime())
-                    tg.create_task(self._receive())
+                    tg.create_task(self._receive(token))
                     tg.create_task(self._play())
                     if not self._lesson_started:
                         self._lesson_started = True
@@ -1093,6 +1202,13 @@ class LiveSession:
                     continue
                 err = _describe(e)
                 print(f"[LangVis] Session ended: {err[:400]}")
+                self._connect_fails = 0 if connected else self._connect_fails + 1
+                if self._live_thinking and ("thinking" in err.lower() or self._connect_fails >= 2):
+                    # This voice model does not take a thinking level: without it.
+                    print("[LangVis] the voice model refuses a thinking level - connecting without")
+                    self._live_thinking = False
+                    self._conn_backoff = 0
+                    continue
                 if resumed and (any(k in err.lower() for k in ("resum", "handle"))
                                 or "INVALID_ARGUMENT" in err or "NOT_FOUND" in err):
                     # A handle the server will not accept: start fresh, or the
@@ -1127,7 +1243,7 @@ class LiveSession:
             finally:
                 self.session = None
                 if len(self._session_log) >= 3:
-                    asyncio.create_task(self._save_session_summary(owner))
+                    asyncio.create_task(self._save_session_summary(owner, self._session_label))
 
             self.set_speaking(False)
             self.ui.set_state("SLEEPING")

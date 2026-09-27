@@ -39,7 +39,7 @@ import time
 from core import store
 from tutor import analysis as an
 from tutor import curriculum as cur
-from tutor import intensive_english, intensive_slovak, slovak_small_talk
+from tutor import english_small_talk, intensive_english, intensive_slovak, slovak_small_talk
 from tutor import progress as pg
 from tutor import topics as tp
 
@@ -174,6 +174,12 @@ def _load(lang: dict | None = None) -> dict:
         # picks another starting level in Settings.
         state["declared_level"] = "A1"
     return state
+
+
+def session_label() -> str:
+    """Which lessons a session's recap belongs to: the Tutor's ("Slovak") or
+    the course's ("Slovak · course") - the Tutor never opens on a course lesson."""
+    return _lang()["name"] + (" · course" if _intensive_on() else "")
 
 
 def language_name() -> str:
@@ -968,6 +974,7 @@ def switch_user() -> None:
         except queue.Empty:
             break
     reset_lesson()
+    _facts.clear()
     _last_record.clear()
     _lexicon_failed.clear()
     _starter_failed.clear()
@@ -1049,9 +1056,11 @@ def _step3(said: str, player=None) -> str:
         state = _load(lang)
     word = _push_word(state, lang)
     topic = _topic_of(state)
+    limit = ""
     if _intensive_on():
         idx, lesson = _current_lesson()
         topic, word = {"name": f"{lesson['title']} - {lesson['speak']}", "prompt": ""}, ""
+        limit = " " + _taught_rule(idx, lesson)
     scenario = topic.get("prompt", "")
     note = (f'Now STEP 3: answer what they originally said ("{said}") in ONE short '
             f'sentence, then ask ONE new question that belongs to the topic "{topic["name"]}"'
@@ -1066,7 +1075,7 @@ def _step3(said: str, player=None) -> str:
     if _turn["events"]:
         note += " Also say in one short sentence: " + " ".join(_turn["events"])
         _turn["events"] = []
-    return note
+    return note + limit
 
 
 def _better_note(better: str, enrich: list) -> str:
@@ -1096,8 +1105,24 @@ def _topic_rule() -> str:
     return rule
 
 
+# What the learner told about themselves while practising ("Bývam v Prešove"):
+# their facts win over every example of the course, for the rest of the session.
+_facts: list[str] = []
+MAX_FACTS = 6
+
+
+def _remember_fact(text: str, names: list[str]) -> None:
+    fact = (f'they said "{text.strip()[:120]}" - {", ".join(dict.fromkeys(names))} is THEIR '
+            "real place / name")
+    _facts[:] = ([f for f in _facts if not any(n in f for n in names)] + [fact])[-MAX_FACTS:]
+
+
 def _next(note: str) -> str:
     rules = _topic_rule()
+    if _facts:
+        rules += (" The learner's own facts - use them in every example and question, never "
+                  "the examples of the course or your memory when they differ: "
+                  + " | ".join(_facts) + ". If one is new, save it with save_memory.")
     if _turn.get("rules"):
         rules += (" The learner's own instructions to you, which win over this note when "
                  "they disagree: " + " | ".join(f'"{r}"' for r in _turn["rules"]) + ".")
@@ -1180,6 +1205,12 @@ def _free_turn(text: str, handled: dict, player=None) -> str | None:
                                "now (point at it in one more sentence).")
         _turn["drill"] = list(outcome["repeated"])
     improved = result.get("improved", "")
+    if improved and _intensive_on():
+        idx = _current_lesson()[0]
+        if not _taught_only(improved, text, idx):
+            # "Teraz bývam ..." in lesson 1: a better version they cannot know yet.
+            print(f"[Tutor] better version with untaught words skipped: {improved[:60]}")
+            improved = ""
     if not _intensive_on() and not _turn.get("practice"):
         return _next(_tutor_reply(text, result, player))
     if result["corrections"]:
@@ -1302,9 +1333,98 @@ def _late() -> bool:
 
 _gate_deadline = [0.0]
 
+# Hearing a sentence starts early: when the learner pauses, the model call
+# starts at once, while the pause is still being timed. If they go on talking
+# the early call is thrown away; if the pause becomes the end of the sentence,
+# its answer is ready sooner (see core/live.py, prehear).
+_early: dict = {"key": None, "future": None}
+_early_lock = threading.Lock()
+_early_pool = None      # its own threads: abandoned early hearings never hold up a real one
+
+
+def _early_executor():
+    global _early_pool
+    with _early_lock:
+        if _early_pool is None:
+            from concurrent.futures import ThreadPoolExecutor
+            _early_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="early")
+        return _early_pool
+
+
+def _needs_analysis(seconds: float) -> bool:
+    """A full analysis (their own sentence) or only the words (a repeat, a
+    short answer, a lesson step)."""
+    return not (seconds < SHORT_TURN or _turn["phase"] != "free")
+
+
+def _hear(pcm16k: bytes, seconds: float, deadline: float = 0.0) -> dict:
+    """The model call of a sentence: {"text"} or {"text", "result"}, or
+    {"paused": True} when the learner paused the tutor."""
+    lang = _lang()
+    if not _needs_analysis(seconds):
+        return {"text": an.transcribe(pcm16k, lang["name"], vocabulary=_transcribe_hints(),
+                                      native_language=_native(), deadline=deadline)}
+    with _lock:
+        state = _load(lang)
+        ctx = _analysis_ctx(state, lang)
+        paused = bool(state.get("paused"))
+    if paused:
+        return {"paused": True}
+    text, result = an.analyse_audio(pcm16k, deadline=deadline, **ctx)
+    return {"text": text, "result": result, "analysed": True}
+
+
+def prehear(key, pcm16k: bytes, seconds: float) -> None:
+    """The learner has paused: start hearing what they said so far."""
+    fut = _early_executor().submit(_hear, pcm16k, seconds, time.monotonic() + 12.0)
+    with _early_lock:
+        _early.update(key=key, future=fut, analysed=_needs_analysis(seconds))
+
+
+def _heard(pcm16k: bytes, seconds: float, key, deadline: float) -> dict:
+    """The early call's answer when it heard this very sentence, else a new call."""
+    with _early_lock:
+        fut = _early["future"] if key is not None and _early["key"] == key else None
+        same_kind = _early.get("analysed") == _needs_analysis(seconds)
+        _early.update(key=None, future=None)
+    if fut is not None and same_kind:
+        try:
+            return fut.result(timeout=max(0.5, (deadline or time.monotonic() + 10) - time.monotonic()))
+        except Exception as e:
+            print(f"[Tutor] early hearing failed ({str(e)[:60]}) - hearing it again")
+    return _hear(pcm16k, seconds, deadline)
+
+
+def _own_version(text: str, player=None) -> dict | None:
+    """Asked to repeat "Teraz bývam v Bratislave", they said "Teraz bývam v
+    Prešov": not a failed repeat but THEIR fact. It is remembered and the
+    sentence is checked as their own - the correction keeps their place."""
+    names = an.new_names(_turn.get("expected", ""), text)
+    if not names:
+        return None
+    _remember_fact(text, names)
+    _turn.update(phase="free", expected="", better="", enrich=[], attempts=0, must=[])
+    return _decide(text, None, player)
+
+
+def late_note() -> str:
+    """The check of a sentence took too long: the tutor answers what it heard,
+    and stays where the lesson is."""
+    return _next("the check of this sentence did not finish in time. Do NOT start anything new "
+                 "and do NOT change the topic: react to what you heard in ONE short sentence "
+                 "(if you did not understand it, ask them kindly to say it again), then repeat "
+                 "your last question or task. Then STOP and wait.")
+
+
+def expects_repeat(text: str) -> bool:
+    """The learner was asked to say exactly this (a lesson step, a correction)
+    and did: their repeat, not the tutor's echo - however quick it came."""
+    expected = _turn.get("expected") or ""
+    return bool(expected) and _turn["phase"] != "free" and _similar(text, expected) >= REPEAT_OK
+
 
 def gate_audio(pcm16k: bytes, seconds: float, player=None, echo=None,
-               deadline: float = 0.0) -> dict:
+               deadline: float = 0.0, early_key=None) -> dict:
     """The learner has just stopped speaking and the tutor is waiting. Hear
     what they said and decide the reply.
 
@@ -1317,9 +1437,9 @@ def gate_audio(pcm16k: bytes, seconds: float, player=None, echo=None,
     _gate_deadline[0] = deadline
     lang = _lang()
     try:
-        if seconds < SHORT_TURN or _turn["phase"] != "free":
-            text = an.transcribe(pcm16k, lang["name"], vocabulary=_transcribe_hints(),
-                                 native_language=_native())
+        heard = _heard(pcm16k, seconds, early_key, deadline)
+        if not heard.get("analysed") and not heard.get("paused"):
+            text = heard["text"]
             if not an.words(text):
                 return {"drop": True}
             if echo is not None and echo(text):
@@ -1344,18 +1464,17 @@ def gate_audio(pcm16k: bytes, seconds: float, player=None, echo=None,
                 if _SKIP_RE.search(text) and len(an.words(text)) <= 6:
                     return {"text": text, "note": _skip_note(player), "handled": True}
                 if _similar(text, _turn["expected"]) >= REPEAT_OTHER:
+                    own = _own_version(text, player)
+                    if own:
+                        return own
                     _repeat_feedback(player, text)
                     return {"text": text, "note": _repeat_turn(text, player), "handled": True}
             if seconds < SHORT_TURN:
                 _live_sentence(player, text)
                 return {"text": text, "note": None}      # "yes", "okay": answered normally
-        with _lock:
-            state = _load(lang)
-            ctx = _analysis_ctx(state, lang)
-            paused = bool(state.get("paused"))
-        if paused:
+        if heard.get("paused"):
             return {"text": "", "note": None}
-        text, result = an.analyse_audio(pcm16k, **ctx)
+        text, result = heard["text"], heard["result"]
     except Exception as e:
         _analysis_failed(player, e)
         return {"text": "", "note": None}
@@ -1381,6 +1500,10 @@ def gate_text(text: str, player=None) -> dict:
     text = (text or "").strip()
     if not text:
         return {"text": "", "note": None}
+    if _turn["phase"] not in ("free", "teach") and _similar(text, _turn["expected"]) >= REPEAT_OTHER:
+        own = _own_version(text, player)
+        if own:
+            return own
     if _turn["phase"] == "teach":
         _live_sentence(player, text)
         if _SKIP_RE.search(text) and len(an.words(text)) <= 4:
@@ -1926,10 +2049,10 @@ def _teach_again(player=None) -> str:
 
 # Keyed by course; a language can have several (its first one is its default).
 INTENSIVE_COURSES = {"slovak": intensive_slovak.COURSE, "slovak_talk": slovak_small_talk.COURSE,
-                     "english": intensive_english.COURSE}
+                     "english": intensive_english.COURSE, "english_talk": english_small_talk.COURSE}
 # Every course on the Courses page; one without its material yet shows as coming.
 COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("slovak_talk", "Slovak", "A1 → A2"),
-                  ("english", "English", "A2 → B1+")]
+                  ("english", "English", "A2 → B1+"), ("english_talk", "English", "A2 → B1")]
 REVIEW_ITEMS = 4
 
 
@@ -2038,6 +2161,47 @@ def _lesson_pack(idx: int, lesson: dict, course: dict | None = None) -> dict:
     }
 
 
+def _lesson_texts(lesson: dict) -> list[str]:
+    """Every sentence of a lesson's material."""
+    g = lesson.get("grammar") or {}
+    out = [i["text"] for i in lesson.get("words", []) + lesson.get("phrases", [])]
+    out += [e[0] if isinstance(e, (list, tuple)) else str(e) for e in g.get("examples") or []]
+    out += [d["text"] for d in lesson.get("dialogue") or []]
+    out += [p["text"] for chain in lesson.get("extend") or [] for p in chain]
+    out += [t.get("sk", "") for t in lesson.get("translate") or []]
+    out += [b["answer"] for b in lesson.get("build") or []]
+    out += [q["example"] for q in lesson.get("questions") or []]
+    return out
+
+
+def _taught_words(idx: int) -> set[str]:
+    """Every word the course has shown up to and including lesson `idx`."""
+    lessons = (_course() or {}).get("lessons", [])[:idx + 1]
+    return {w for l in lessons for t in _lesson_texts(l) for w in an.words(t)}
+
+
+def _taught_only(sentence: str, said: str, idx: int) -> bool:
+    """Only words the course has taught (or the learner used themselves) -
+    inflected forms of them count."""
+    known = _taught_words(idx) | set(an.words(said))
+    return all(any(an._stem_match(w, k) for k in known) for w in an.words(sentence))
+
+
+def _taught_rule(idx: int, lesson: dict) -> str:
+    """What the tutor may say in the free parts of a course lesson."""
+    course = _course() or {}
+    earlier = [l["title"] for l in course.get("lessons", [])[:idx]]
+    ex = _explain_in(lesson["band"])
+    return ("LANGUAGE LIMIT - the learner knows ONLY what the course has taught so far: this "
+            "lesson's words and phrases (" + ", ".join(i["text"] for i in lesson["words"] + lesson["phrases"])
+            + ")" + (" and the lessons before it (" + "; ".join(earlier[-8:]) + ")" if earlier else "")
+            + ". Every question, every example answer and every 'say it' must use ONLY that "
+            "language, and each question must be one they CAN answer with it - ask only about "
+            "what this lesson taught, never about the topics of later lessons. If a new word is "
+            f"truly needed, TEACH it first: say it, what it means in {ex}, and ask them to say it - "
+            f"only then use it. When you speak {ex}, one short, simple sentence at a time.")
+
+
 def _intensive_plan(idx: int, lesson: dict, lang: dict) -> str:
     course = _course() or {}
     total = len(course.get("lessons", []))
@@ -2052,6 +2216,7 @@ def _intensive_plan(idx: int, lesson: dict, lang: dict) -> str:
         "Phrases: " + " | ".join(p["text"] for p in lesson["phrases"]),
         f"Grammar: {lesson['grammar']['name']} - {lesson['grammar']['rule']}",
         f"Speaking task after the steps: {lesson['speak']}",
+        _taught_rule(idx, lesson),
         ("Already learned (use these words freely, they are known): " + "; ".join(earlier))
         if earlier else "Nothing learned before this lesson: use ONLY this lesson's words.",
         "The lesson's steps come one by one in [NEXT] notes: teach exactly the step you are "
@@ -2087,7 +2252,7 @@ def _intensive_finish(pack: dict) -> str:
             f"task: {lesson['speak']} Start it now with ONE question or your first line in the "
             "role, using this lesson's words, and give a model answer they can change. From now on "
             "your job is to get them TALKING: follow-up questions, and ask them to make short "
-            "answers longer. "
+            "answers longer. " + _taught_rule(idx, lesson) + " "
             + (f"When they want to go on, the next lesson is \"{nxt}\" (they say 'next lesson'). "
                if nxt else "This was the last lesson of the course - congratulate them. ")
             + "Then STOP and wait.")

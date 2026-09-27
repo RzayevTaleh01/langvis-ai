@@ -178,12 +178,22 @@ class App:
             self.user_id = None
 
     def _start_session(self) -> None:
-        if self._session_task and not self._session_task.done():
+        task = self._session_task
+        if task and not task.done():
+            if self.live and getattr(self.live, "_stopping", False):
+                # The last lesson is still closing (Stop, another page): the
+                # new one starts as soon as it has, and never inside it.
+                asyncio.get_running_loop().create_task(self._start_after(task))
             return
         if not is_configured():
             self.ui.prompt_reconfig()
             return
         self._session_task = asyncio.get_running_loop().create_task(self.live.run())
+
+    async def _start_after(self, task: asyncio.Task) -> None:
+        await asyncio.wait({task}, timeout=5)
+        if task.done():
+            self._start_session()
 
     # ── Status, board and syllabus: pushed when they change ──────────────────
 
@@ -497,7 +507,8 @@ class App:
                     await asyncio.to_thread(fn, int(lesson), self.ui)
         except Exception as e:
             self.ui.write_log(f"ERR: could not open the course - {e}")
-        running = self._session_task is not None and not self._session_task.done()
+        running = (self._session_task is not None and not self._session_task.done()
+                   and not getattr(self.live, "_stopping", False))
         if running and self.live:
             self.live.restart(new_topic=True)
         else:

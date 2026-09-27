@@ -11,7 +11,7 @@ and ask about any grammar or word.
 | | |
 |---|---|
 | **Languages** | English · Slovak - switched in the header, each with its own level and progress |
-| **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · English A2 → B1+ phrasal verbs for daily speaking (20 lessons, 5 weeks) |
+| **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · Slovak A1 → A2 small talk (28 lessons, 7 weeks) · English A2 → B1+ phrasal verbs for daily speaking (20 lessons, 5 weeks) · English A2 → B1 small talk (20 lessons, 5 weeks) |
 | **Tutor** | free conversation: 13 topics + your own, or free talk; grammar on the board whenever you ask |
 | **Voice** | real-time two-way audio through the Gemini Live API |
 | **Platform** | Python server + any modern browser · Windows, macOS, Linux |
@@ -283,6 +283,11 @@ Beginner speech is slow and has an accent, so LangVis helps the listening side:
   You repeating "Say it: prosím" a moment later is you.
 - A sentence that takes too long to check changes nothing in the lesson; the
   lesson never moves on without the tutor knowing.
+- **Checking is fast.** The check starts already during your pause (after
+  about half of the end silence); if you go on talking it is thrown away. The
+  checker hears the sentence without its long end silence, is asked not to
+  think at length, and when a model is slow a second one starts beside it.
+  The log shows each turn's timing as `[Speed] ...`.
 
 ---
 

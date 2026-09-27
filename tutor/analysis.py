@@ -205,21 +205,151 @@ def _rest_for(err: str) -> float | None:
     return None
 
 
+# The learner is waiting while these calls run, so they are made for speed:
+# no long thinking (a transcript or a sentence check needs none), a short
+# timeout, and a second model started in parallel when the first is slow.
+FAST_TIMEOUT_MS = 9000            # one fast call; the voice session waits ~10 s in total
+HEDGE_AFTER = 3.5                 # s before a slow fast call gets a second model beside it
+# How each model is told to think little. Gemini 3 models take a thinking
+# level, older ones a budget; a model that refuses one style gets the next.
+_THINK_STYLES = ("level", "budget", "none")
+_think_style: dict[str, str] = {}
+_pool = None
+_pool_lock = threading.Lock()
+
+
+def _executor():
+    global _pool
+    with _pool_lock:
+        if _pool is None:
+            from concurrent.futures import ThreadPoolExecutor
+            _pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="gemini")
+        return _pool
+
+
+def _contents(prompt: str, audio_wav: bytes | None):
+    if not audio_wav:
+        return prompt
+    from google.genai import types
+    return [types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"), prompt]
+
+
+def _fast_config(model: str, json_out: bool, style: str):
+    from google.genai import types
+    cfg: dict = {"http_options": types.HttpOptions(timeout=FAST_TIMEOUT_MS)}
+    if json_out:
+        cfg["response_mime_type"] = "application/json"
+    if style == "level":
+        cfg["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)
+    elif style == "budget":
+        cfg["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
+    return types.GenerateContentConfig(**cfg)
+
+
+def _call_fast(key: str, m: str, contents, json_out: bool) -> str:
+    """One quick call to one model, trying the thinking styles it accepts."""
+    start = _THINK_STYLES.index(_think_style.get(m, _THINK_STYLES[0]))
+    for style in _THINK_STYLES[start:]:
+        try:
+            resp = _client_for(key).models.generate_content(
+                model=m, contents=contents, config=_fast_config(m, json_out, style))
+        except Exception as e:
+            err = str(e)
+            if style != "none" and ("thinking" in err.lower()
+                                    or ("400" in err and "INVALID_ARGUMENT" in err)):
+                continue                    # this model takes another style
+            raise
+        _think_style[m] = style
+        return (getattr(resp, "text", "") or "").strip()
+    raise RuntimeError(f"{m}: no thinking style accepted")
+
+
+def _mark_failed(key: str, m: str, err: str, n: int) -> bool:
+    """Let a model rest after an error; False if the error is not the model's."""
+    rest = _rest_for(err)
+    if rest is None:
+        return False
+    _resting[(key[-6:], m)] = time.monotonic() + rest
+    print(f"[Analysis] {m}{' (key ' + str(n + 1) + ')' if n else ''} not available "
+          f"({err[:40]}) - trying the next model")
+    return True
+
+
+def _note_used(model: str, used: str) -> None:
+    if _last_used.get(model) != used:
+        if model in _last_used or used != model:
+            print(f"[Analysis] now using {used}")
+        _last_used[model] = used
+
+
+def gemini_fast(prompt: str, model: str = ANALYSIS_MODEL, audio_wav: bytes | None = None,
+                json_out: bool = False, deadline: float = 0.0) -> str:
+    """Like gemini(), for a learner who is waiting: minimal thinking, a short
+    timeout, and when a model is slow (busy, a bad connection) the next one
+    starts beside it - the first good answer wins. `deadline`: monotonic time
+    after which nothing is waited for any more."""
+    from concurrent.futures import FIRST_COMPLETED, wait
+    keys = _keys()
+    if not keys:
+        raise RuntimeError("No Gemini API key - add one in Settings.")
+    contents = _contents(prompt, audio_wav)
+    candidates = [(n, key, m) for n, key in enumerate(keys) for m in _chain(model)]
+    deadline = deadline or time.monotonic() + FAST_TIMEOUT_MS / 1000 * 2
+    running: dict = {}
+    last: Exception | None = None
+
+    def launch() -> bool:
+        while candidates:
+            n, key, m = candidates.pop(0)
+            if time.monotonic() < _resting.get((key[-6:], m), 0.0):
+                continue
+            fut = _executor().submit(_call_fast, key, m, contents, json_out)
+            running[fut] = (n, key, m)
+            return True
+        return False
+
+    launch()
+    while running:
+        left = deadline - time.monotonic()
+        if left <= 0:
+            break
+        done, _ = wait(list(running), timeout=min(HEDGE_AFTER, left), return_when=FIRST_COMPLETED)
+        if not done:
+            if len(running) < 2:
+                launch()                    # slow: a second model beside it
+            continue
+        for fut in done:
+            n, key, m = running.pop(fut)
+            try:
+                text = fut.result()
+            except Exception as e:
+                err = str(e)
+                last = e
+                if "API key not valid" in err or "API_KEY_INVALID" in err or "PERMISSION_DENIED" in err:
+                    candidates[:] = [c for c in candidates if c[1] != key]
+                elif not _mark_failed(key, m, err, n):
+                    raise
+                if not running:
+                    launch()
+                continue
+            _note_used(model, f"{m}{' · key ' + str(n + 1) if n else ''}")
+            return text
+    if running:
+        raise TimeoutError("the models were too slow this time")
+    raise last or RuntimeError("Every Gemini model is resting - try again later.")
+
+
 def gemini(prompt: str, model: str = ANALYSIS_MODEL, audio_wav: bytes | None = None,
            json_out: bool = False) -> str:
-    contents: object = prompt
-    if audio_wav:
-        from google.genai import types
-        contents = [types.Part.from_bytes(data=audio_wav, mime_type="audio/wav"), prompt]
+    contents = _contents(prompt, audio_wav)
     config = {"response_mime_type": "application/json"} if json_out else None
     last: Exception | None = None
     keys = _keys()
     if not keys:
         raise RuntimeError("No Gemini API key - add one in Settings.")
     for n, key in enumerate(keys):
-        tail = key[-6:]
         for m in _chain(model):
-            if time.monotonic() < _resting.get((tail, m), 0.0):
+            if time.monotonic() < _resting.get((key[-6:], m), 0.0):
                 continue
             try:
                 resp = _client_for(key).models.generate_content(model=m, contents=contents, config=config)
@@ -228,19 +358,11 @@ def gemini(prompt: str, model: str = ANALYSIS_MODEL, audio_wav: bytes | None = N
                 if "API key not valid" in err or "API_KEY_INVALID" in err or "PERMISSION_DENIED" in err:
                     last = e
                     break                       # this key is no good: the next key
-                rest = _rest_for(err)
-                if rest is None:
+                if not _mark_failed(key, m, err, n):
                     raise
-                _resting[(tail, m)] = time.monotonic() + rest
-                print(f"[Analysis] {m}{' (key ' + str(n + 1) + ')' if n else ''} not available "
-                      f"({err[:40]}) - trying the next model")
                 last = e
                 continue
-            used = f"{m}{' · key ' + str(n + 1) if n else ''}"
-            if _last_used.get(model) != used:
-                if model in _last_used or used != model:
-                    print(f"[Analysis] now using {used}")
-                _last_used[model] = used
+            _note_used(model, f"{m}{' · key ' + str(n + 1) if n else ''}")
             return (getattr(resp, "text", "") or "").strip()
     raise last or RuntimeError("Every Gemini model is resting - try again later.")
 
@@ -552,6 +674,46 @@ RULES:
 """
 
 
+# ── The learner's own facts ──────────────────────────────────────────────────
+# A place or a name the learner says is THEIR fact. A model "improving" the
+# sentence likes to swap it for the one in the course material ("Bývam v
+# Prešove" came back as "Bývam v Bratislave"). Names are recognised by their
+# capital letter (not the first word of a sentence) and compared by their stem,
+# so "Prešov" and "v Prešove" are the same place.
+
+def _stem_match(a: str, b: str) -> bool:
+    a, b = a.lower(), b.lower()
+    if a == b:
+        return True
+    n = min(len(a), len(b))
+    k = max(4, n - 2)
+    return n >= 4 and a[:k] == b[:k]
+
+
+def names(text: str) -> list[str]:
+    """The capitalised words that are not the first of a sentence."""
+    out = []
+    for sentence in re.split(r"[.!?]+\s*", text or ""):
+        for w in _WORD_RE.findall(sentence)[1:]:      # words() lowercases
+            if w[:1].isupper():
+                out.append(w)
+    return out
+
+
+def new_names(said: str, other: str) -> list[str]:
+    """Names in `other` that `said` never mentioned."""
+    theirs = names(said) + words(said)
+    return [n for n in names(other) if not any(_stem_match(n, t) for t in theirs)]
+
+
+def keeps_facts(said: str, other: str) -> bool:
+    """`other` (a correction, a better version) keeps the learner's names and
+    places and adds none of its own."""
+    if new_names(said, other):
+        return False
+    return all(any(_stem_match(n, t) for t in words(other)) for n in names(said))
+
+
 def pcm_to_wav(pcm16k: bytes) -> bytes:
     import io
     import wave
@@ -564,12 +726,14 @@ def pcm_to_wav(pcm16k: bytes) -> bytes:
     return buf.getvalue()
 
 
-def analyse_audio(pcm16k: bytes, **ctx) -> tuple[str, dict]:
+def analyse_audio(pcm16k: bytes, deadline: float = 0.0, **ctx) -> tuple[str, dict]:
     """Hear the learner's own voice, write down exactly what they said - their
     mistakes kept, which live speech-to-text tends to smooth over - and analyse
     it, in ONE call. Returns (transcript, analysis); the analysis is {} when the
-    speech was not in the target language or was unusable."""
-    raw = gemini(analysis_prompt("", from_audio=True, **ctx), audio_wav=pcm_to_wav(pcm16k))
+    speech was not in the target language or was unusable. The learner is
+    waiting for it: a fast call."""
+    raw = gemini_fast(analysis_prompt("", from_audio=True, **ctx), audio_wav=pcm_to_wav(pcm16k),
+                      deadline=deadline)
     data = parse_json(raw)
     text = str(data.get("transcript") or "").strip()
     if not text:
@@ -578,7 +742,8 @@ def analyse_audio(pcm16k: bytes, **ctx) -> tuple[str, dict]:
 
 
 def transcribe(pcm16k: bytes, language_name: str = "English", expected: str = "",
-               vocabulary: list[str] | None = None, native_language: str = "") -> str:
+               vocabulary: list[str] | None = None, native_language: str = "",
+               deadline: float = 0.0) -> str:
     """Only the words - for a repeat, where there is nothing new to analyse.
 
     A beginner's accent is hard to hear, so for a repeat the transcriber may be
@@ -599,14 +764,19 @@ def transcribe(pcm16k: bytes, language_name: str = "English", expected: str = ""
         + f" Write exactly what they really said, word for word. Spell {language_name} words "
         f"correctly, with all diacritics. Names of places and people exactly as heard. Keep "
         "their grammar mistakes and missing words, never correct or complete the sentence. "
-        "If they speak another language, write that as said. Return only the words.")
+        f"They speak {language_name}; only when they clearly switch to "
+        + (f"{native_language} or " if native_language else "")
+        + "English, write that as said. NEVER turn their words into French, Spanish, Italian "
+        f"or any other language - an unclear word is the closest {language_name} word. "
+        "Return only the words.")
     model = ANALYSIS_MODEL if language_name == "English" else LESSON_MODEL
-    return gemini(prompt, model=model, audio_wav=pcm_to_wav(pcm16k)).strip().strip('"')
+    return gemini_fast(prompt, model=model, audio_wav=pcm_to_wav(pcm16k),
+                       deadline=deadline).strip().strip('"')
 
 
 def analyse(text: str, **ctx) -> dict:
     """Analyse one target-language utterance. {} when unusable."""
-    return _finish(parse_json(gemini(analysis_prompt(text, **ctx))), text, ctx["skills"])
+    return _finish(parse_json(gemini_fast(analysis_prompt(text, **ctx))), text, ctx["skills"])
 
 
 def _finish(data: dict, text: str, skills: dict) -> dict:
@@ -638,7 +808,14 @@ def _finish(data: dict, text: str, skills: dict) -> dict:
         data[key] = str(data.get(key) or "").strip()
     if not data["corrected"]:
         data["corrected"] = text.strip()
+    if not keeps_facts(text, data["corrected"]):
+        # A "correction" that swaps their place or name is not one.
+        print(f"[Analysis] a correction that changed their facts was dropped: {data['corrected'][:60]}")
+        data["corrected"], data["corrections"] = text.strip(), []
 
+    if data["improved"] and not keeps_facts(text, data["improved"]):
+        print(f"[Analysis] a better version that changed their facts was dropped: {data['improved'][:60]}")
+        data["improved"] = ""
     enrich = []
     improved_low = data["improved"].lower()
     for e in data.get("enrich") or []:
