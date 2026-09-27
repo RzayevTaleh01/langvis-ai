@@ -49,6 +49,9 @@ LIVE_MODEL      = "models/gemini-3.1-flash-live-preview"
 # frame, little enough that Interrupt is heard to stop straight away.
 PLAYBACK_LEAD = 0.30              # seconds
 RECEIVE_BYTES_PER_SEC = 24000 * 2
+# The tutor's words reach the page when the voice before them is nearly
+# played - not when the model writes them, seconds ahead of the voice.
+WORDS_EARLY = 0.15                # s before that voice ends
 
 ECHO_GUARD = 0.5                  # s after the tutor's voice ends: cutting in still needs a louder voice
 ECHO_TAIL = 2.5                   # s after it ends: a sentence starting now is checked for its echo
@@ -379,6 +382,7 @@ class LiveSession:
         self._tutor_text = ""          # what the tutor said lately - to recognise its echo
         self._turn_spoke = False       # the tutor's current turn has already made a sound
         self._drop_rest = False        # a tool call ended a spoken turn: the rest is not said
+        self._words_gen = 0            # an Interrupt makes words still on their way stale
         self._early_key = None         # the sentence an early hearing was started for
         self._timing: dict | None = None   # when this turn's steps happened, for the speed log
         self._live_thinking = True     # the voice model is asked to think little (off if it refuses)
@@ -773,6 +777,7 @@ class LiveSession:
     def interrupt(self) -> None:
         """Stop the tutor mid-speech: drop its queued voice, let the learner talk."""
         self._interrupted = True
+        self._words_gen += 1
         q = self.audio_in_queue
         while q:
             try:
@@ -917,7 +922,7 @@ class LiveSession:
                             # The tutor's words, as it says them, in its bubble -
                             # not the rest of a turn the learner cut off.
                             if not self._interrupted:
-                                self.ui.send({"type": "tutor_words", "text": " ".join(out_buf)})
+                                self._words_out(" ".join(out_buf), False)
 
                     if sc.input_transcription and sc.input_transcription.text:
                         txt = _clean_transcript(sc.input_transcription.text)
@@ -956,7 +961,7 @@ class LiveSession:
                             self._awaiting_answer = _holds_floor(full_out)
                             self.ui.write_log(f"{self._asst_name}: {full_out}")
                             self._session_log.append(f"{self._asst_name}: {full_out}")
-                            self.ui.send({"type": "tutor_words", "text": full_out, "final": True})
+                            self._words_out(full_out, True)
                             said = plugin_fn("tutor_said")
                             if said is not None:
                                 asyncio.create_task(asyncio.to_thread(said, full_out, self.ui))
@@ -980,6 +985,30 @@ class LiveSession:
                         self._expect_reply()      # the answer comes after the tool
                     await self.session.send_tool_response(function_responses=responses)
 
+    def _words_out(self, text: str, final: bool) -> None:
+        """The tutor's words go into the voice queue right after the voice they
+        belong with, so the page shows them as they are said (see _play)."""
+        msg = {"type": "tutor_words", "text": text}
+        if final:
+            msg["final"] = True
+        if self.audio_in_queue is None:
+            self.ui.send(msg)
+            return
+        self.audio_in_queue.put_nowait(msg)
+
+    def _release_words(self, msg: dict) -> None:
+        """Send the words when the voice before them has almost been played."""
+        gen = self._words_gen
+        delay = max(0.0, self._play_until - time.monotonic() - WORDS_EARLY)
+
+        def send():
+            if gen == self._words_gen:
+                self.ui.send(msg)
+        if delay <= 0.01:
+            send()
+        else:
+            asyncio.get_running_loop().call_later(delay, send)
+
     def _log_speed(self) -> None:
         """Once per turn: how long the learner waited, step by step."""
         t = self._timing
@@ -995,6 +1024,7 @@ class LiveSession:
         """Release the tutor's voice to the browser at speaking speed, so the
         server knows when it is speaking and Interrupt can stop it."""
         self._play_until = 0.0
+        words = None                    # tutor's words that came right after this batch
         try:
             while True:
                 try:
@@ -1006,14 +1036,21 @@ class LiveSession:
                         self.set_speaking(False)
                         self._turn_done_event.clear()
                     continue
+                if isinstance(chunk, dict):
+                    self._release_words(chunk)      # words, with no new voice before them
+                    continue
 
                 self.set_speaking(True)
                 batch = bytearray(chunk)
                 while len(batch) < 9600:
                     try:
-                        batch.extend(self.audio_in_queue.get_nowait())
+                        more = self.audio_in_queue.get_nowait()
                     except asyncio.QueueEmpty:
                         break
+                    if isinstance(more, dict):
+                        words = more
+                        break
+                    batch.extend(more)
 
                 now = time.monotonic()
                 ahead = self._play_until - now
@@ -1024,6 +1061,9 @@ class LiveSession:
                     now = time.monotonic()
                 self._play_until = max(self._play_until, now) + len(batch) / RECEIVE_BYTES_PER_SEC
                 self.ui.send_audio(bytes(batch))
+                if words is not None:
+                    self._release_words(words)
+                    words = None
         finally:
             self.set_speaking(False)
 

@@ -66,3 +66,17 @@
   .cp-section-meta { display: none; }
   .cp-now-row [data-slot="button"] { width: 100%; }
 }
+
+/* The tutor on the home page (components/home-guide.tsx): a picture beside the
+   sections, never over them. Between 900 and 1360 px the page keeps a margin
+   on the right for it; on a phone it floats small at the top. */
+.home-guide { position: fixed; top: 0; left: 0; width: 104px; height: 104px; z-index: 5;
+  pointer-events: none; will-change: transform; transform-origin: 50% 80%; }
+.home-guide .face { width: 100%; height: 100%; overflow: visible; }
+@media (min-width: 900px) and (max-width: 1359px) {
+  .page.home.has-guide { padding-right: 140px; }
+}
+@media (max-width: 899px) {
+  .page.home { position: relative; }
+  .home-guide { position: absolute; top: 12px; right: 8px; left: auto; width: 64px; height: 64px; }
+}

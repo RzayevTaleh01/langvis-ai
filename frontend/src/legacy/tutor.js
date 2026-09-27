@@ -1,7 +1,11 @@
 // The tutor - the LangVis face, drawn in SVG. It lives ON the board, walks to
 // whatever it is explaining, and shows what it says in its speech bubble.
 //
-//   mouth   opens with the REAL audio level of the voice being played
+//   mouth   a smile; it opens with the REAL audio level of the voice being
+//           played, and takes the shape of the letter being said (round for
+//           o and u, wide for a, e and i, closed for m, b and p) - the words
+//           in the speech block are typed out at the same pace
+//   cheeks  a light blush, warmer when it talks or grins
 //   eyes    wide listening, narrowed explaining, looking away thinking,
 //           closed asleep; the pupils look at the word it is pointing at
 //   rim     the state colour - green listening, terracotta speaking,
@@ -17,6 +21,21 @@ const BODY = "M250 110 C295 110 360 175 360 220 C360 265 295 330 250 330 " +
              "C205 330 140 265 140 220 C140 175 205 110 250 110 Z";
 const EYE_L = "M190 230 L190 195 C190 178 205 168 220 168 C235 168 242 178 242 195 L242 230 Z";
 const EYE_R = "M258 230 L258 195 C258 178 265 168 280 168 C295 168 310 178 310 195 L310 230 Z";
+const CHEEK = "#f08a74";
+const MOUTH_Y = 248;
+
+// The shape of the mouth for a letter: [width, how far it opens].
+const SHAPES = {
+  a: [1.05, 1], e: [1.15, 0.62], i: [1.2, 0.38], y: [1.2, 0.38], o: [0.7, 0.95], u: [0.58, 0.66],
+  m: [0.95, 0], b: [0.95, 0], p: [0.95, 0], f: [1, 0.22], v: [1, 0.22], w: [0.62, 0.5],
+};
+function shapeOf(ch) {
+  if (!ch) return [0.9, 0.25];
+  const c = ch.normalize("NFD").charAt(0).toLowerCase();
+  if (SHAPES[c]) return SHAPES[c];
+  return /[a-z]/.test(c) ? [0.95, 0.5] : [0.9, 0.25];      // another consonant / a pause
+}
+let faces = 0;
 
 function el(tag, attrs = {}, parent) {
   const node = document.createElementNS(NS, tag);
@@ -26,8 +45,16 @@ function el(tag, attrs = {}, parent) {
 }
 
 export class TutorFace {
-  constructor(host, audio) {
+  // `opts.onReveal(text, done)`: the words said so far, as the mouth says them.
+  constructor(host, audio, opts = {}) {
     this.audio = audio;
+    this.onReveal = opts.onReveal || null;
+    this.id = ++faces;
+    this.full = "";            // the tutor's words of this turn, as far as they have arrived
+    this.shownF = 0;           // how many of them have been "said" (typed out)
+    this.done = false;
+    this.shape = [1, 1];
+    this.grin = 0;             // a happy open smile, 0..1 (the home page)
     this.state = "SLEEPING";
     this.muted = false;
     this.look = null;          // {x, y} unit vector towards what it points at
@@ -75,8 +102,14 @@ export class TutorFace {
       return { g, pupil, glint, cx: left ? 216 : 284, px: left ? 204 : 272 };
     });
     this.dots = [0, 1, 2].map((i) => el("circle", { cx: 214 + i * 36, cy: 86, r: 7, fill: C.think }, this.root));
-    this.mouthEl = el("rect", { fill: C.ink }, this.root);
-    this.tongue = el("rect", { fill: C.speak, "fill-opacity": 0.82 }, this.root);
+    this.cheeks = [182, 318].map((cx) => el("ellipse", { cx, cy: 246, rx: 13, ry: 7.5, fill: CHEEK }, this.root));
+    // The mouth is one path: a smiling line when closed, a smiling open mouth
+    // when it talks; the tongue is clipped to it.
+    const clip = el("clipPath", { id: `tutor-mouth-${this.id}` }, defs);
+    this.clipPath = el("path", {}, clip);
+    this.mouthEl = el("path", { fill: C.ink, "stroke-linecap": "round", "stroke-linejoin": "round" }, this.root);
+    this.tongue = el("ellipse", { fill: C.speak, "fill-opacity": 0.85,
+                                  "clip-path": `url(#tutor-mouth-${this.id})` }, this.root);
     host.prepend(svg);
     this.svg = svg;
   }
@@ -84,6 +117,29 @@ export class TutorFace {
   set(state, muted) {
     this.state = state;
     this.muted = !!muted;
+  }
+
+  // The tutor's words of this turn so far. They are typed out as the voice
+  // says them, and the mouth takes the shape of the letter being said.
+  follow(text, final) {
+    text = text || "";
+    let same = 0;
+    const n = Math.min(this.full.length, text.length);
+    while (same < n && this.full[same] === text[same]) same += 1;
+    if (same < Math.min(12, text.length)) this.shownF = 0;      // a new turn
+    else this.shownF = Math.min(this.shownF, same);
+    this.full = text;
+    this.done = !!final;
+    if (!this.onReveal) this.shownF = text.length;
+    this.reveal();
+  }
+
+  reveal() {
+    const shown = Math.min(this.full.length, Math.floor(this.shownF));
+    if (shown === this.revealed && this.done === this.revealedDone) return;
+    this.revealed = shown;
+    this.revealedDone = this.done;
+    if (this.onReveal) this.onReveal(this.full.slice(0, shown), this.done && shown >= this.full.length);
   }
 
   tone() {
@@ -115,13 +171,28 @@ export class TutorFace {
     this.amp += (live - this.amp) * 0.45;
     const amp = this.amp;
 
+    // Typing the words out at speaking pace: faster when they have piled up,
+    // almost still while the voice pauses, and at once after it has stopped.
+    if (this.full.length > this.shownF) {
+      const backlog = this.full.length - this.shownF;
+      let cps = 40;
+      if (speaking) cps = backlog > 40 ? 26 : (amp < 0.03 && backlog < 25 ? 4 : 14);
+      this.shownF = Math.min(this.full.length, this.shownF + cps * 0.033);
+      this.reveal();
+    } else if (this.done) this.reveal();
+
+    // The letter being said gives the mouth its shape.
+    const shapeTo = speaking ? shapeOf(this.full[Math.floor(this.shownF)]) : [1, 1];
+    this.shape = this.shape.map((v, i) => v + (shapeTo[i] - v) * 0.45);
+
     let target;
     if (this.muted || this.state === "SLEEPING") target = 0;
-    else if (speaking) target = 0.22 + amp * 1.5;
-    else if (this.state === "THINKING") target = 0.06;
-    else target = 0.10 + amp * 0.5;
+    else if (speaking) target = (0.22 + amp * 1.5) * (0.35 + 0.65 * this.shape[1]) * (amp < 0.02 ? 0.3 : 1);
+    else if (this.state === "THINKING") target = 0.03;
+    else target = amp * 0.5 + this.grin * 0.3;
     target = Math.max(0, Math.min(1, target));
     this.mouth += (target - this.mouth) * (speaking ? 0.5 : 0.25);
+    this.grin *= 0.97;
 
     if (this.state === "SLEEPING") this.blink += (1 - this.blink) * 0.15;
     else {
@@ -150,7 +221,8 @@ export class TutorFace {
     const tone = this.tone();
     const speaking = this.state === "SPEAKING";
     const thinking = this.state === "THINKING";
-    const listening = !(speaking || this.muted || this.state === "SLEEPING");
+    const idle = this.state === "IDLE";          // only a picture (the home page)
+    const listening = !(speaking || this.muted || this.state === "SLEEPING" || idle);
 
     this.rings.forEach((ring, i) => {
       const phase = ((this.tick * 0.011) + i * 0.5) % 1;
@@ -197,29 +269,38 @@ export class TutorFace {
       dot.setAttribute("fill-opacity", thinking ? ((70 + lift * 150) / 255).toFixed(3) : 0);
     });
 
+    const warm = this.muted ? 0.12 : 0.3 + amp * 0.35 + this.grin * 0.2;
+    this.cheeks.forEach((c) => c.setAttribute("fill-opacity", warm.toFixed(3)));
+
     const open = this.mouth;
+    const sad = this.muted || this.state === "SLEEPING";
     if (open < 0.06) {
-      Object.entries({ x: 232, y: 252, width: 36, height: 5, rx: 2.5 })
-        .forEach(([k, v]) => this.mouthEl.setAttribute(k, v));
-      this.tongue.setAttribute("height", 0);
+      // Closed: a smiling line (flatter when muted or asleep).
+      const curve = sad ? 5 : 15;
+      this.mouthEl.setAttribute("d", `M226 ${MOUTH_Y - 1} Q250 ${MOUTH_Y - 1 + curve} 274 ${MOUTH_Y - 1}`);
+      this.mouthEl.setAttribute("fill", "none");
+      this.mouthEl.setAttribute("stroke", C.ink);
+      this.mouthEl.setAttribute("stroke-width", 5.5);
+      this.tongue.setAttribute("ry", 0);
     } else {
-      const h = 8 + open * 30;
-      const w = 38 + open * 10;
-      this.mouthEl.setAttribute("x", (250 - w / 2).toFixed(2));
-      this.mouthEl.setAttribute("y", 248);
-      this.mouthEl.setAttribute("width", w.toFixed(2));
-      this.mouthEl.setAttribute("height", h.toFixed(2));
-      this.mouthEl.setAttribute("rx", Math.min(h * 0.5, w * 0.35).toFixed(2));
-      if (open > 0.35) {
-        const th = (h - 6) * 0.45;
-        this.tongue.setAttribute("x", (250 - (w - 16) / 2).toFixed(2));
-        this.tongue.setAttribute("y", (248 + h - th - 3).toFixed(2));
-        this.tongue.setAttribute("width", (w - 16).toFixed(2));
-        this.tongue.setAttribute("height", th.toFixed(2));
-        this.tongue.setAttribute("rx", (th * 0.5).toFixed(2));
-      } else {
-        this.tongue.setAttribute("height", 0);
-      }
+      // Open: a smile whose corners stay up, shaped by the letter being said.
+      const [wf, hf] = this.shape;
+      const w = (40 + open * 12) * (speaking ? wf : 1.05);
+      const h = (7 + open * 26) * (speaking ? 0.55 + 0.45 * Math.max(hf, 0.25) : 1);
+      const round = speaking ? Math.max(0, 1 - wf) * 1.6 : 0;      // o and u: rounder, corners lower
+      const y0 = MOUTH_Y - 2 + round * 3;
+      const l = 250 - w / 2, r = 250 + w / 2;
+      const d = `M${l.toFixed(1)} ${y0.toFixed(1)} Q250 ${(y0 + 5 - round * 6).toFixed(1)} ${r.toFixed(1)} ${y0.toFixed(1)} `
+              + `Q250 ${(y0 + h * 1.9).toFixed(1)} ${l.toFixed(1)} ${y0.toFixed(1)} Z`;
+      this.mouthEl.setAttribute("d", d);
+      this.mouthEl.setAttribute("fill", C.ink);
+      this.mouthEl.setAttribute("stroke", C.ink);
+      this.mouthEl.setAttribute("stroke-width", 2);
+      this.clipPath.setAttribute("d", d);
+      this.tongue.setAttribute("cx", 250);
+      this.tongue.setAttribute("cy", (y0 + h * 0.95).toFixed(1));
+      this.tongue.setAttribute("rx", (w * 0.3).toFixed(1));
+      this.tongue.setAttribute("ry", open > 0.3 ? (h * 0.32).toFixed(1) : 0);
     }
   }
 }
@@ -373,12 +454,18 @@ export class TutorWalker {
   }
 
   // What the tutor says is written in the speech block at the top of the board.
+  // The face types it out as its mouth says it (TutorFace.follow).
   speech(text, final) {
     const box = this.speechBox;
     if (!box || !text) return;
-    box.textContent = text;
-    box.classList.toggle("live", !final);
-    box.closest(".speech").classList.remove("empty");
-    box.scrollTop = box.scrollHeight;
+    if (!this.face.onReveal) {
+      this.face.onReveal = (shown, done) => {
+        box.textContent = shown;
+        box.classList.toggle("live", !done);
+        box.closest(".speech").classList.remove("empty");
+        box.scrollTop = box.scrollHeight;
+      };
+    }
+    this.face.follow(text, final);
   }
 }

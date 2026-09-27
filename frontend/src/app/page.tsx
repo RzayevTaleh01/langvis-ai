@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CourseCard } from "@/components/course-card";
+import { HomeGuide } from "@/components/home-guide";
 import { LanguageChoiceDialog, useCatalog } from "@/components/dialogs";
 import { useLive } from "@/components/live-provider";
 import { firstName, useAuth } from "@/components/auth-provider";
@@ -26,6 +27,7 @@ function GuestHome() {
   const router = useRouter();
   return (
     <main className="page home" id="page-home">
+      <HomeGuide />
       <section className="home-hero">
         <img className="home-logo" src="/img/logo-full.png" alt="langvis.ai" />
         <h1>Learn to speak a language with a live voice teacher</h1>
@@ -84,6 +86,7 @@ function UserHome() {
 
   return (
     <main className="page home" id="page-home">
+      <HomeGuide />
       <section className="welcome">
         <div className="welcome-text">
           <div className="home-card-kicker">Welcome back</div>
