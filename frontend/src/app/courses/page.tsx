@@ -2,13 +2,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Courses: the course of the language being learned - your progress with the
 // lesson to do now, and the whole syllabus week by week (every lesson with its
-// parts, words and grammar).
+// parts, words and grammar). A language with more than one course shows them
+// as tabs; ?course= opens one of them.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckIcon, ChevronDownIcon, LockIcon, PlayIcon } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLive } from "@/components/live-provider";
 import { getJson } from "@/lib/api";
 import { usePage } from "@/lib/use-page";
@@ -19,21 +21,29 @@ export default function CoursesPage() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [failed, setFailed] = useState(false);
+  const [view, setView] = useState<string | null>(null);
   const language = ((live.status.modes || []).find((m: any) => m.active) || {}).name;
 
+  useEffect(() => { setView(new URLSearchParams(window.location.search).get("course") || ""); }, []);
   const load = useCallback(async () => {
-    const d = await getJson("/api/intensive");
+    if (view === null) return;
+    const d = await getJson("/api/intensive" + (view ? `?course=${encodeURIComponent(view)}` : ""));
     if (!d || d.error) { setFailed(true); return; }
     setFailed(false);
     setData(d);
-  }, []);
+  }, [view]);
   useEffect(() => { load(); }, [load, language]);
 
+  const show = (key: string) => {
+    setView(key);
+    window.history.replaceState(null, "", `/courses/?course=${encodeURIComponent(key)}`);
+  };
+
   // "Start / Continue the lesson" and a lesson's own button are an explicit
-  // start: they open the lesson and begin at once, with the course chosen first.
-  const open = (startWith: { track?: string; lesson?: number }) => {
+  // start: they open the lesson and begin at once, in the course shown.
+  const open = (startWith: { lesson?: number }) => {
     router.push("/lesson/");
-    live.begin(startWith, "lesson");
+    live.begin({ track: `intensive:${data.key}`, ...startWith }, "lesson");
   };
 
   return (
@@ -45,14 +55,15 @@ export default function CoursesPage() {
           <p className="sub">{`There is no course for ${data.language} yet.`}</p>
         </div>
       )}
-      {data && data.available && <Course data={data} open={open} />}
+      {data && data.available && <Course key={data.key} data={data} open={open} show={show} />}
     </main>
   );
 }
 
-type Open = (s: { track?: string; lesson?: number }) => void;
+type Open = (s: { lesson?: number }) => void;
 
-function Course({ data, open }: { data: any; open: Open }) {
+function Course({ data, open, show }: { data: any; open: Open; show: (key: string) => void }) {
+  const courses: any[] = (data.courses || []).filter((c: any) => c.available);
   const lessons: any[] = data.lessons;
   const cur = lessons[data.current];
   const going = data.step > 0;
@@ -63,6 +74,17 @@ function Course({ data, open }: { data: any; open: Open }) {
 
   return (
     <div className="cp-wrap">
+      {courses.length > 1 && (
+        <Tabs value={data.key} onValueChange={show}>
+          <TabsList>
+            {courses.map((c) => (
+              <TabsTrigger key={c.key} value={c.key}>
+                {c.title.split(" · ").filter((p: string) => p !== c.name && p !== c.levels).pop() || c.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
       <div className="cp-head">
         <h1>{data.title}</h1>
         <p>{`${data.weeks.length} weeks · ${data.total} lessons`}</p>
@@ -79,7 +101,7 @@ function Course({ data, open }: { data: any; open: Open }) {
             <div className="cp-card-title">{`Lesson ${cur.index + 1}: ${cur.title}`}</div>
             {going && <p className="int-step">{`Step ${data.step + 1} of ${data.steps}`}</p>}
           </div>
-          <Button size="lg" onClick={() => open({ track: "intensive" })}>
+          <Button size="lg" onClick={() => open({})}>
             <PlayIcon />{going ? "Continue the lesson" : "Start the lesson"}
           </Button>
         </div>

@@ -77,9 +77,9 @@ function UserHome() {
   const language = ((status.modes || []).find((m: any) => m.active) || {}).name || user?.learning;
   const g = status.grammar || {};
 
-  const openCourse = (name: string, key: string) => {
-    if (key === current) router.push("/courses/");
-    else live.switchLanguage(name, "/courses/");
+  const openCourse = (name: string, key: string, lang: string) => {
+    if (lang === catalog?.language) router.push(`/courses/?course=${encodeURIComponent(key)}`);
+    else live.switchLanguage(name, `/courses/?course=${encodeURIComponent(key)}`);
   };
 
   return (
@@ -107,9 +107,9 @@ function UserHome() {
         </ul>
       </section>
 
-      <Courses catalog={catalog} only={current} language={language} button={(c) => (
-        <Button type="button" onClick={() => openCourse(c.name, c.key)}>
-          {c.key === current ? "Open my course" : `Learn ${c.name}`}</Button>
+      <Courses catalog={catalog} only={catalog?.language} language={language} button={(c) => (
+        <Button type="button" onClick={() => openCourse(c.name, c.key, c.lang)}>
+          {c.key === current ? "Open my course" : "Open this course"}</Button>
       )} />
 
       <LanguageChoiceDialog open={ask} onOpenChange={setAsk} />
@@ -125,7 +125,7 @@ function Courses({ catalog, button, only, language }: {
   catalog: any; button: (c: any) => React.ReactNode; only?: string; language?: string;
 }) {
   const all: any[] = (catalog && catalog.courses) || [];
-  const courses = only ? all.filter((c) => c.key === only) : all;
+  const courses = only ? all.filter((c) => c.lang === only) : all;
   const current = catalog?.current;
   return (
     <section className="home-section" id="courses">

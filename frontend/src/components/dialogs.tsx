@@ -340,10 +340,12 @@ export function LanguageChoiceDialog({ open, onOpenChange }: OpenProps) {
   const router = useRouter();
   const catalog = useCatalog();
   const current = useMemo(() => ((status.modes || []).find((m: any) => m.active) || {}).key, [status]);
-  const pick = (name: string, key: string) => {
+  // Every course is a choice; a language can have more than one.
+  const pick = (name: string, key: string, lang: string) => {
     onOpenChange(false);
-    if (key === current) router.push("/courses/");
-    else switchLanguage(name, "/courses/");
+    const to = `/courses/?course=${encodeURIComponent(key)}`;
+    if (lang === current) router.push(to);
+    else switchLanguage(name, to);
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -354,11 +356,11 @@ export function LanguageChoiceDialog({ open, onOpenChange }: OpenProps) {
         </DialogHeader>
         <div className="lang-options">
           {((catalog && catalog.courses) || []).map((c: any) => (
-            <button type="button" key={c.key} className={"lang-option" + (c.key === current ? " current" : "")}
-                    onClick={() => pick(c.name, c.key)}>
+            <button type="button" key={c.key} className={"lang-option" + (c.lang === current ? " current" : "")}
+                    onClick={() => pick(c.name, c.key, c.lang)}>
               <strong>{c.name}</strong>
               <span>{`${c.levels} · ${c.lessons} lessons`}</span>
-              <span className="lang-option-note">{c.key === current ? "You are learning it now" : c.learner}</span>
+              <span className="lang-option-note">{c.key === catalog?.current ? "Your course now" : c.learner}</span>
             </button>
           ))}
         </div>

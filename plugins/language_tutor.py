@@ -39,7 +39,7 @@ import time
 from core import store
 from tutor import analysis as an
 from tutor import curriculum as cur
-from tutor import intensive_english, intensive_slovak
+from tutor import intensive_english, intensive_slovak, slovak_small_talk
 from tutor import progress as pg
 from tutor import topics as tp
 
@@ -1924,23 +1924,52 @@ def _teach_again(player=None) -> str:
 # material lesson by lesson, step by step, and remembers exactly where the
 # learner stopped. It runs on the same step engine as a topic's taught part.
 
-INTENSIVE_COURSES = {"slovak": intensive_slovak.COURSE, "english": intensive_english.COURSE}
-# Every language on the Courses page; one without a course yet shows as coming.
-COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("english", "English", "A2 → B1+")]
+# Keyed by course; a language can have several (its first one is its default).
+INTENSIVE_COURSES = {"slovak": intensive_slovak.COURSE, "slovak_talk": slovak_small_talk.COURSE,
+                     "english": intensive_english.COURSE}
+# Every course on the Courses page; one without its material yet shows as coming.
+COURSE_CATALOG = [("slovak", "Slovak", "A1 → B1"), ("slovak_talk", "Slovak", "A1 → A2"),
+                  ("english", "English", "A2 → B1+")]
 REVIEW_ITEMS = 4
 
 
-def _course() -> dict | None:
-    return INTENSIVE_COURSES.get(_mode_key())
+def _course_lang(ckey: str) -> str:
+    """The language a course teaches ("slovak_talk" -> "slovak")."""
+    return (INTENSIVE_COURSES.get(ckey) or {}).get("language") or ckey
+
+
+def _courses_of(lang_key: str) -> list[str]:
+    return [k for k in INTENSIVE_COURSES if _course_lang(k) == lang_key]
+
+
+def _course_key(lang_key: str | None = None) -> str:
+    """The course chosen for a language (its first course until another is chosen)."""
+    lang_key = lang_key or _mode_key()
+    keys = _courses_of(lang_key)
+    chosen = str(_setting("course_" + lang_key, ""))
+    return chosen if chosen in keys else (keys[0] if keys else "")
+
+
+def _course(ckey: str | None = None) -> dict | None:
+    return INTENSIVE_COURSES.get(ckey or _course_key())
 
 
 def _intensive_on() -> bool:
     return str(_setting("track", "normal")) == "intensive" and _course() is not None
 
 
-def _intensive_load(lang: dict | None = None) -> dict:
+def _progress_key(lang: dict, ckey: str | None) -> str:
+    """Where a course's progress is kept: a language's first course under the
+    language itself (as before), any other under "slovak.slovak_talk"."""
+    lang_key = next((k for k, l in cur.LANGUAGES.items() if l["name"] == lang["name"]), _key(lang))
+    ckey = ckey or _course_key(lang_key)
+    keys = _courses_of(lang_key)
+    return _key(lang) if not keys or ckey == keys[0] else f"{_key(lang)}.{ckey}"
+
+
+def _intensive_load(lang: dict | None = None, ckey: str | None = None) -> dict:
     try:
-        data = store.get("course_progress", _key(lang or _lang())) or {}
+        data = store.get("course_progress", _progress_key(lang or _lang(), ckey)) or {}
     except Exception:
         data = {}
     data.setdefault("lesson", 0)
@@ -1950,8 +1979,8 @@ def _intensive_load(lang: dict | None = None) -> dict:
     return data
 
 
-def _intensive_save(data: dict, lang: dict | None = None) -> None:
-    store.put("course_progress", _key(lang or _lang()), data=data)
+def _intensive_save(data: dict, lang: dict | None = None, ckey: str | None = None) -> None:
+    store.put("course_progress", _progress_key(lang or _lang(), ckey), data=data)
 
 
 def _lesson_open(n: int, prog: dict, idx: int) -> bool:
@@ -1970,10 +1999,10 @@ def _current_lesson(prog: dict | None = None) -> tuple[int, dict] | None:
     return idx, course["lessons"][idx]
 
 
-def _review_items(idx: int) -> list[dict]:
+def _review_items(idx: int, course: dict | None = None) -> list[dict]:
     """Words from earlier lessons to recall: two from the last lesson, the rest
     rotating through the older ones."""
-    lessons = (_course() or {}).get("lessons", [])[:idx]
+    lessons = (course or _course() or {}).get("lessons", [])[:idx]
     if not lessons:
         return []
     out = list(lessons[-1]["words"][:2])
@@ -1986,7 +2015,7 @@ def _review_items(idx: int) -> list[dict]:
     return out[:REVIEW_ITEMS]
 
 
-def _lesson_pack(idx: int, lesson: dict) -> dict:
+def _lesson_pack(idx: int, lesson: dict, course: dict | None = None) -> dict:
     """A course lesson in the shape the step engine teaches."""
     g = lesson["grammar"]
     return {
@@ -1994,7 +2023,7 @@ def _lesson_pack(idx: int, lesson: dict) -> dict:
         "explain_in": _explain_in(lesson["band"]), "partner_role": lesson["partner_role"],
         # An English course is taught in English: no "what it means in English" for its sentences.
         "same_lang": _explain_in(lesson["band"]) == _lang()["name"],
-        "review": _review_items(idx),
+        "review": _review_items(idx, course),
         "words": [dict(w, example=w.get("example", "")) for w in lesson["words"]],
         "phrases": [dict(p, example="") for p in lesson["phrases"]],
         "grammar": {"name": g["name"], "rule": g["rule"], "table": g.get("table", []),
@@ -2091,24 +2120,33 @@ def _intensive_opening(player) -> str | None:
 
 
 def set_track(track: str = "normal", player=None) -> tuple[bool, str]:
-    """Normal topics or a course - chosen on the page. "intensive:slovak" also
-    picks the course's language."""
+    """Normal topics or a course - chosen on the page. "intensive:slovak_talk"
+    (a course) or "intensive:slovak" (a language's chosen course) also picks
+    the course's language."""
     raw = str(track).lower()
     track = "intensive" if raw.startswith("int") else "normal"
     wanted = raw.split(":", 1)[1] if ":" in raw else ""
     if track == "intensive":
-        key = wanted or (_mode_key() if _mode_key() in INTENSIVE_COURSES else next(iter(INTENSIVE_COURSES)))
-        if key not in INTENSIVE_COURSES:
-            name = dict((k, n) for k, n, _ in COURSE_CATALOG).get(key, key)
+        if wanted in INTENSIVE_COURSES:
+            ckey = wanted
+        elif wanted:
+            ckey = _course_key(wanted) if wanted in cur.LANGUAGES else ""
+        else:
+            ckey = _course_key() or next(iter(INTENSIVE_COURSES))
+        if ckey not in INTENSIVE_COURSES:
+            name = dict((k, n) for k, n, _ in COURSE_CATALOG).get(wanted, wanted)
             return False, f"The {name} course is being prepared - coming soon."
+        key = _course_lang(ckey)
+        other = key != _mode_key() or ckey != _course_key(key)
         if key != _mode_key():
             ok, message = set_language(cur.LANGUAGES[key]["name"])
             if not ok:
                 return False, message
-            if str(_setting("track", "normal")) == "intensive":
-                reset_lesson()
-                _status_cache["key"] = None
-                return True, "Course: " + INTENSIVE_COURSES[key]["title"]
+        _save_setting({"course_" + key: ckey})
+        if other and str(_setting("track", "normal")) == "intensive":
+            reset_lesson()
+            _status_cache["key"] = None
+            return True, "Course: " + INTENSIVE_COURSES[ckey]["title"]
     if str(_setting("track", "normal")) == track:
         return True, f"Already in the {track} section."
     _save_setting({"track": track})
@@ -2167,8 +2205,7 @@ def _language_level(key: str, lang: dict) -> dict:
         if not state.get("declared_level"):
             state["declared_level"] = lang.get("start_level") or "A2"
         band, score, _ = pg.effective_level(state)
-        if key in INTENSIVE_COURSES and str(_setting("track", "normal")) == "intensive" \
-                and key == _mode_key():
+        if _intensive_on() and key == _mode_key():
             band = _teach_level(state, lang)
         return {"level": band, "score": round(score)}
     except Exception:
@@ -2274,7 +2311,7 @@ def _course_card(key: str, name: str, levels: str, c: dict) -> dict:
     """What a course list shows of one course."""
     weeks = [dict(w, lessons=[l["title"] for l in c["lessons"] if l["week"] == w["week"]])
              for w in c["weeks"]]
-    return {"key": key, "name": name, "levels": levels, "title": c["title"],
+    return {"key": key, "lang": _course_lang(key), "name": name, "levels": levels, "title": c["title"],
             "learner": c.get("about") or c.get("learner", ""), "lessons": len(c["lessons"]),
             "outcomes": c.get("outcomes") or [l["goal"] for l in c["lessons"][::max(1, len(c["lessons"]) // 6)]][:6],
             "words": sum(len(l.get("words") or []) + len(l.get("phrases") or []) for l in c["lessons"]),
@@ -2283,7 +2320,7 @@ def _course_card(key: str, name: str, levels: str, c: dict) -> dict:
 
 def _course_progress(key: str, c: dict) -> dict:
     """How far the signed-in learner is in a course (of any language)."""
-    prog = _intensive_load(cur.language(key))
+    prog = _intensive_load(cur.language(_course_lang(key)), key)
     idx = max(0, min(int(prog.get("lesson", 0)), len(c["lessons"]) - 1))
     done = [l for l in c["lessons"] if l["id"] in prog["done"]]
     return {"done": len(done), "total": len(c["lessons"]), "current": idx,
@@ -2303,7 +2340,8 @@ def catalog_for_ui(progress: bool = False) -> dict:
         if progress:
             card["progress"] = _course_progress(key, c)
         out.append(card)
-    return {"current": _mode_key() if progress else "", "courses": out,
+    return {"current": _course_key() if progress else "", "language": _mode_key() if progress else "",
+            "courses": out,
             "topics": sum(1 for t in tp.TOPICS if not t.get("free"))}
 
 
@@ -2316,7 +2354,7 @@ def course_for_ui(key: str) -> dict:
             continue
         card = _course_card(k, name, levels, c)
         prog = _course_progress(k, c)
-        done_ids = set(_intensive_load(cur.language(k))["done"])
+        done_ids = set(_intensive_load(cur.language(_course_lang(k)), k)["done"])
         lessons = []
         for n, l in enumerate(c["lessons"]):
             state = ("done" if l["id"] in done_ids else
@@ -2327,35 +2365,41 @@ def course_for_ui(key: str) -> dict:
                             "grammar": (l.get("grammar") or {}).get("name", ""),
                             "words": [w["text"] for w in l.get("words") or []],
                             "speak": l.get("speak", "")})
-        return dict(card, progress=prog, lessons=lessons, current_language=_mode_key() == k,
-                    language=cur.language(k)["name"])
+        return dict(card, progress=prog, lessons=lessons, current_language=_mode_key() == _course_lang(k),
+                    language=cur.language(_course_lang(k))["name"])
     return {"error": "no such course"}
 
 
-def intensive_for_ui() -> dict:
-    """The course map for the Intensive page."""
-    course = _course()
+def intensive_for_ui(view: str = "") -> dict:
+    """The course map for the Courses page: the chosen course of the language
+    being learned - or `view`, another course of that language, shown with its
+    own progress (choosing it happens only when a lesson is started)."""
+    chosen = _course_key()
+    ckey = view if view in _courses_of(_mode_key()) else chosen
+    course = _course(ckey) if ckey else None
     active = str(_setting("track", "normal")) == "intensive"
     courses = []
     for key, name, levels in COURSE_CATALOG:
-        if key != _mode_key():
+        if _course_lang(key) != _mode_key():
             continue                # only the courses of the language being learned
         c = INTENSIVE_COURSES.get(key)
         courses.append({"key": key, "name": name, "levels": levels, "available": bool(c),
+                        "title": c["title"] if c else name,
                         "lessons": len(c["lessons"]) if c else 0,
                         "weeks": len(c["weeks"]) if c else 0,
-                        "current": key == _mode_key()})
+                        "current": key == chosen, "shown": key == ckey})
     if not course:
         return {"available": False, "active": active, "language": _lang()["name"],
-                "courses": courses, "languages": [cur.LANGUAGES[k]["name"] for k in INTENSIVE_COURSES]}
-    prog = _intensive_load()
-    idx = _current_lesson(prog)[0]
+                "courses": courses, "languages": sorted({cur.LANGUAGES[_course_lang(k)]["name"]
+                                                         for k in INTENSIVE_COURSES})}
+    prog = _intensive_load(ckey=ckey)
+    idx = max(0, min(int(prog.get("lesson", 0)), len(course["lessons"]) - 1))
     lessons = []
     for n, l in enumerate(course["lessons"]):
         state = ("done" if l["id"] in prog["done"] else
                  "current" if n == idx else "locked")
         parts: list[dict] = []
-        for st in _teach_steps(_lesson_pack(n, l)):
+        for st in _teach_steps(_lesson_pack(n, l, course)):
             if not parts or parts[-1]["kind"] != st["kind"]:
                 parts.append({"kind": st["kind"], "label": _SECTION[st["kind"]][0], "count": 0})
             parts[-1]["count"] += 1
@@ -2368,9 +2412,9 @@ def intensive_for_ui() -> dict:
                         "steps": sum(pt["count"] for pt in parts)})
     steps = lessons[idx]["steps"]
     return {"available": True, "active": active, "language": _lang()["name"], "courses": courses,
-            "title": course["title"], "about": course.get("about", ""),
-            "levels": next((lv for k, _n, lv in COURSE_CATALOG if k == _mode_key()), ""),
-            "outcomes": _course_card(_mode_key(), _lang()["name"], "", course)["outcomes"],
+            "key": ckey, "title": course["title"], "about": course.get("about", ""),
+            "levels": next((lv for k, _n, lv in COURSE_CATALOG if k == ckey), ""),
+            "outcomes": _course_card(ckey, _lang()["name"], "", course)["outcomes"],
             "words_total": sum(len(l["words"]) + len(l.get("phrases") or []) for l in course["lessons"]),
             "weeks": course["weeks"], "lessons": lessons,
             "current": idx, "step": int(prog.get("step", 0)), "steps": steps,
@@ -2794,7 +2838,7 @@ def status_for_ui() -> dict:
         lang = _lang()
         key = (lang["name"], store.version("learner_progress"), store.version("topic_materials"),
                time.strftime("%Y-%m-%d"), store.version("course_progress"),
-               str(_setting("track", "normal")))
+               str(_setting("track", "normal")), _course_key())
         if _status_cache["key"] != key:
             with _lock:
                 state = _load(lang)
@@ -3335,14 +3379,13 @@ def _set_level(level: str) -> str:
                   max(0, len(stages) - 1))
         state["course"] = dict(pg._empty_course(), stage=si)
         _save(state, lang)
-    course = _course()
-    if course:
-        lessons = course["lessons"]
+    for ckey in _courses_of(_mode_key()):
+        lessons = INTENSIVE_COURSES[ckey]["lessons"]
         first = next((n for n, l in enumerate(lessons)
                       if cur.band_index(l["band"]) >= cur.band_index(level)), len(lessons) - 1)
-        prog = _intensive_load(lang)
+        prog = _intensive_load(lang, ckey)
         prog["lesson"], prog["step"] = first, 0
-        _intensive_save(prog, lang)
+        _intensive_save(prog, lang, ckey)
     _save_setting({"starting_level": level})
     return f"The learner now starts from {level}: level, lessons and course all begin there."
 

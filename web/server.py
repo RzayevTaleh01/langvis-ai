@@ -297,8 +297,10 @@ class App:
         fn = plugin_fn(getter) if getter else None
         if fn is None:
             return web.json_response({"error": "not available"}, status=404)
+        # The Courses page may show another course of the language (?course=).
+        args = (request.query.get("course", ""),) if getter == "intensive_for_ui" else ()
         try:
-            value = await asyncio.to_thread(fn)
+            value = await asyncio.to_thread(fn, *args)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
         return _json(value)
@@ -484,14 +486,15 @@ class App:
         """Start, with the course (or course lesson) chosen on the Courses page."""
         track, lesson = data.get("track"), data.get("lesson")
         try:
+            # The course first (a lesson may come with the course it is in).
+            if track:
+                fn = plugin_fn("set_track")
+                if fn is not None:
+                    await asyncio.to_thread(fn, str(track), self.ui)
             if lesson is not None:
                 fn = plugin_fn("goto_lesson")
                 if fn is not None:
                     await asyncio.to_thread(fn, int(lesson), self.ui)
-            elif track:
-                fn = plugin_fn("set_track")
-                if fn is not None:
-                    await asyncio.to_thread(fn, str(track), self.ui)
         except Exception as e:
             self.ui.write_log(f"ERR: could not open the course - {e}")
         running = self._session_task is not None and not self._session_task.done()
