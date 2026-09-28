@@ -61,11 +61,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function GuestHeader({ authPage, path }: { authPage: boolean; path: string }) {
   return (
     <header className="bar guest-bar">
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a className="brand" href="/" aria-label="langvis.ai - home">
+      <Link className="brand" href="/" aria-label="langvis.ai - home">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="brand-logo" src="/static/logo-bar.png" alt="langvis.ai" />
-      </a>
+      </Link>
       <div className="spacer" />
       {!authPage && (
         <nav className="guest-links">

@@ -42,6 +42,9 @@ type Live = {
   flash: (text: string, ok?: boolean) => void;
   log: LogLine[];
   loadHistory: () => void;
+  // What the system heard of the learner's last sentence: listening while they
+  // talk, then the words as written down - or nothing clear.
+  heard: Heard;
   page: Page;
   setPage: (p: Page) => void;
   begin: (startWith?: StartWith, on?: Page) => void;
@@ -75,6 +78,8 @@ function parseLine(text: string): LogLine {
   return { id: ++lineId, kind: "plain", text };
 }
 
+export type Heard = { kind: "idle" | "listening" | "checking" | "text" | "none"; text: string };
+
 export function LiveProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<any>(null);
   if (audioRef.current === null && typeof window !== "undefined") audioRef.current = new VoiceAudio();
@@ -96,6 +101,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   const [notice, setNotice] = useState<{ text: string; ok: boolean; id: number } | null>(null);
   const [log, setLog] = useState<LogLine[]>([]);
   const [page, setPage] = useState<Page>("home");
+  const [heard, setHeard] = useState<Heard>({ kind: "idle", text: "" });
 
   // Latest values for callbacks that outlive a render.
   const live = useRef({ started: false, beginning: false, startedOn: "" as string, startWith: {} as StartWith,
@@ -105,8 +111,16 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   live.current.page = page;
   live.current.status = status;
 
-  // Replayed on the board when it mounts after the messages arrived.
-  const lastBoard = useRef<{ lesson?: any; mode?: any; coaching?: any; speech?: string }>({});
+  // Replayed on the board when it mounts after the messages arrived - only on
+  // the page it came from: a course lesson's card never shows up in the Tutor.
+  const lastBoard = useRef<{ lesson?: any; mode?: any; coaching?: any; speech?: string; page?: Page }>({});
+
+  // The board snapshot of the page the lesson runs on (see registerBoard).
+  const boardOf = () => {
+    const owner = (live.current.startedOn || live.current.page) as Page;
+    if (lastBoard.current.page !== owner) lastBoard.current = { page: owner };
+    return lastBoard.current;
+  };
 
   const send = useCallback((obj: any) => {
     const ws = wsRef.current;
@@ -130,6 +144,9 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addLog = useCallback((text: string) => {
+    // The learner's own line in the transcript is also what was heard.
+    const line = parseLine(text);
+    if (line.kind === "you" && line.text) setHeard({ kind: "text", text: line.text });
     setLog((l) => {
       const next = [...l, parseLine(text)];
       return next.length > 700 ? next.slice(next.length - 700) : next;
@@ -242,9 +259,17 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
         setState(live.current.state);
         break;
       case "live_sentence": b?.board.showLive(msg.text, msg.final); break;
-      case "hearing": b?.board.hearing(msg.value); break;
-      case "mode": lastBoard.current.mode = msg; b?.board.setMode(msg.mode, msg.expect); break;
-      case "lesson": lastBoard.current.lesson = msg.card || {}; b?.board.lesson(msg.card || {}); break;
+      case "hearing":
+        b?.board.hearing(msg.value);
+        if (msg.value === true) setHeard({ kind: "listening", text: "" });
+        else if (msg.value === false) setHeard((h) => (h.kind === "listening" ? { kind: "checking", text: "" } : h));
+        else if (msg.value === null) setHeard((h) => (h.kind === "text" ? h : { kind: "none", text: "" }));
+        break;
+      case "heard":
+        setHeard(msg.text ? { kind: "text", text: msg.text } : { kind: "none", text: "" });
+        break;
+      case "mode": boardOf().mode = msg; b?.board.setMode(msg.mode, msg.expect); break;
+      case "lesson": boardOf().lesson = msg.card || {}; b?.board.lesson(msg.card || {}); break;
       case "tutor_words":
         if (b) {
           if (!live.current.tutorTurnOpen && !msg.final) b.board.hideAnswers();
@@ -252,7 +277,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
           b.board.onWords(msg.text);
         }
         live.current.tutorTurnOpen = !msg.final;
-        if (msg.final) lastBoard.current.speech = msg.text;
+        if (msg.final) boardOf().speech = msg.text;
         break;
       case "answers": b?.board.answers(msg); break;
       case "stopped": stopped(); break;
@@ -289,7 +314,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
       }
       case "coaching": {
         const card = msg.data || {};
-        lastBoard.current.coaching = card;
+        boardOf().coaching = card;
         setCoaching(card);
         b?.board.render(card);
         if (card.notice && card.notice_stamp !== (live.current as any).noticeStamp) {
@@ -379,9 +404,11 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   const registerBoard = useCallback((api: BoardApi | null) => {
     boardRef.current = api;
     if (!api) return;
-    // Catch up with what arrived before the board was on the page.
+    // Catch up with what arrived before the board was on the page - if it
+    // belongs to this page (the course lesson and the Tutor are two places).
     api.face.set(live.current.state, live.current.muted);
     api.board.setState(live.current.state);
+    if (lastBoard.current.page && lastBoard.current.page !== live.current.page) lastBoard.current = {};
     const last = lastBoard.current;
     if (last.coaching) api.board.render(last.coaching);
     if (last.lesson) api.board.lesson(last.lesson);
@@ -390,10 +417,10 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<Live>(() => ({
     audio: audioRef.current, send, sendSoon, status, coaching, syllabus, state, stateText, muted, started,
-    needKey, setNeedKey, seatTakenBy, content, setContent, notice, flash, log, loadHistory, page, setPage,
+    needKey, setNeedKey, seatTakenBy, content, setContent, notice, flash, log, loadHistory, heard, page, setPage,
     begin, stop, switchLanguage, registerBoard, boardRef,
   }), [send, sendSoon, status, coaching, syllabus, state, stateText, muted, started, needKey, seatTakenBy, content,
-       notice, flash, log, loadHistory, page, begin, stop, switchLanguage, registerBoard]);
+       notice, flash, log, loadHistory, heard, page, begin, stop, switchLanguage, registerBoard]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

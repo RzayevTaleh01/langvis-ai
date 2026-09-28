@@ -30,17 +30,18 @@ function GuestHome() {
       <HomeGuide />
       <section className="home-hero">
         <img className="home-logo" src="/img/logo-full.png" alt="langvis.ai" />
-        <h1>Learn to speak a language with a live voice teacher</h1>
-        <p className="home-lead">Talk with LangVis by voice. It checks every sentence, shows your mistakes
-          on a board and helps you say it better.</p>
+        <h1>Learn any language by talking - with a friendly AI teacher</h1>
+        <p className="home-lead">LangVis is an AI language assistant you talk to by voice. It checks every
+          sentence, shows your mistakes on a board and makes practice feel like play - from your very
+          first words (A1) to confident, fluent speech (C1).</p>
         <div className="home-cta">
           <Button asChild size="lg" className="home-start"><Link href="/register/">Create a free account</Link></Button>
           <Button asChild variant="outline"><Link href="/login/">I already have an account</Link></Button>
         </div>
         <ul className="home-how">
-          <li><strong>Courses</strong><span>Step-by-step lessons from zero. The teacher remembers where you stopped.</span></li>
-          <li><strong>Tutor</strong><span>Free talk about any topic. Mistakes are corrected kindly.</span></li>
-          <li><strong>Progress</strong><span>Your level, words and grammar are saved for you.</span></li>
+          <li><strong>Courses</strong><span>Step-by-step lessons for the language and the level you choose, A1 to C1.</span></li>
+          <li><strong>Tutor</strong><span>Free talk about anything you like. Mistakes are corrected kindly.</span></li>
+          <li><strong>Progress</strong><span>Your level, words and grammar grow with you - and are always kept.</span></li>
         </ul>
       </section>
 
@@ -57,7 +58,7 @@ function GuestHome() {
 
       <section className="home-final">
         <h2>Ready to speak?</h2>
-        <p className="home-sub">Your own account keeps your level, course, words and mistakes - only yours.</p>
+        <p className="home-sub">Pick a language, press Start and talk. Your account keeps your level, words and mistakes - only yours.</p>
         <Button asChild size="lg" className="home-start"><Link href="/register/">Create a free account</Link></Button>
         <p className="home-author">langvis.ai · designed and built by Taleh Rzayev</p>
       </section>
@@ -95,8 +96,7 @@ function UserHome() {
             {" "}Continue your course, or just talk with your tutor.</p>
           <div className="home-cta welcome-cta">
             <Button asChild size="lg" className="home-start"><Link href="/courses/">Continue my course</Link></Button>
-            {/* The Tutor is a page of its own: it is loaded afresh. */}
-            <Button asChild variant="outline"><a href="/tutor/">Talk with the Tutor</a></Button>
+            <Button asChild variant="outline"><Link href="/tutor/">Talk with the Tutor</Link></Button>
             <Button variant="ghost" type="button" onClick={() => setAsk(true)}>Learn another language</Button>
           </div>
         </div>
@@ -133,7 +133,7 @@ function Courses({ catalog, button, only, language }: {
   return (
     <section className="home-section" id="courses">
       <h2>{only && language ? `${language} courses` : "Our courses"}</h2>
-      <p className="home-sub">Every course is written for real speaking: short lessons, week by week, with a teacher that follows the material and remembers where you stopped.</p>
+      <p className="home-sub">Every course is made for real speaking: short lessons, week by week, at your level. Start with a ready course below - LangVis can prepare courses for more languages and levels, from A1 to C1.</p>
       <div className="cc-grid">
         {courses.map((c) => <CourseCard key={c.key} course={c} current={c.key === current} action={button(c)} />)}
       </div>
@@ -145,32 +145,20 @@ function TwoWays() {
   return (
     <section className="home-section">
       <h2>Two ways to learn</h2>
-      <p className="home-sub">Choose the side that fits the moment - and switch any time from the header.</p>
+      <p className="home-sub">Whatever language you learn, choose the side that fits the moment - and switch any time from the header.</p>
       <div className="home-two">
         <article className="home-card">
           <div className="home-card-kicker">Courses</div>
-          <h3>Step by step, from zero</h3>
-          <p>A course is fixed, hand-written material. The teacher follows it exactly, never skips
-            and never jumps ahead, and remembers the step where you stopped.</p>
-          <ul>
-            <li>Review, new words, ready phrases, one grammar point</li>
-            <li>A dialogue line by line, translation or sentence building</li>
-            <li>Questions about your own life, then a speaking task</li>
-            <li>The syllabus stays open on the left while you learn</li>
-          </ul>
+          <h3>Step by step, at your level</h3>
+          <p>A course is a clear path for your language and your level. Your teacher takes you through it
+            lesson by lesson and always remembers where you stopped - so every day you simply go on.</p>
           <img src="/img/03-course-words.png" alt="A course lesson on the board" loading="lazy" />
         </article>
         <article className="home-card">
           <div className="home-card-kicker">Tutor</div>
-          <h3>Free conversation, gentle help</h3>
-          <p>A friendly conversation partner, not a drill. Pick a topic or just talk, and ask for
-            any grammar rule, word or role play at any moment.</p>
-          <ul>
-            <li>A mistake is corrected once, kindly - no forced repeats</li>
-            <li>Now and then: one more natural way to say it</li>
-            <li>Grammar drawn on the board whenever you ask</li>
-            <li>Follow-up questions that keep you speaking</li>
-          </ul>
+          <h3>Help with anything you want</h3>
+          <p>Your own teacher, ready for whatever you need: talk about anything you like, ask about a
+            word or a rule, get ready for a trip or an interview - the Tutor helps you with it.</p>
           <img src="/img/07-topic-correction.png" alt="A correction in the Tutor" loading="lazy" />
         </article>
       </div>
@@ -203,14 +191,15 @@ function HowChecked() {
 function Beginners() {
   return (
     <section className="home-section">
-      <h2>Made for beginners</h2>
+      <h2>Made for every learner</h2>
       <div className="home-three">
-        <div className="home-mini"><h3>Explained simply</h3><p>Slovak A1 is explained in simple English,
-          later levels in simple Slovak - with the Azerbaijani translation of every word on the board.</p></div>
+        <div className="home-mini"><h3>Explained at your level</h3><p>A beginner hears every rule in simple
+          words of a language they know; later levels learn in the new language itself - with a translation
+          into your own language on the board.</p></div>
         <div className="home-mini"><h3>Heard correctly</h3><p>A slow sentence is not cut off, names are
           written as you say them, and repeating after the teacher is never mistaken for its echo.</p></div>
-        <div className="home-mini"><h3>Nothing starts by itself</h3><p>The teacher begins only when you
-          press Start, and stops when you leave the page or change the topic, language or lesson.</p></div>
+        <div className="home-mini"><h3>Fun, not a drill</h3><p>Short steps, a cheerful teacher, instant
+          feedback and grammar drawn on the board - practice you want to come back to every day.</p></div>
       </div>
     </section>
   );
@@ -227,7 +216,7 @@ function Progress() {
             correction ever made.</p></div>
           <div><h3>Dictionary</h3><p>Every word and phrase you met, with how often and on how many
             different days you used it - it comes back until it is yours.</p></div>
-          <div><h3>Grammar</h3><p>Every rule from A1 to B2 with how well you know it, measured from
+          <div><h3>Grammar</h3><p>Every rule of your level with how well you know it, measured from
             what you actually say.</p></div>
         </div>
         <img src="/img/12-account.png" alt="Your account" loading="lazy" />

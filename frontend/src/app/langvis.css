@@ -67,16 +67,45 @@
   .cp-now-row [data-slot="button"] { width: 100%; }
 }
 
-/* The tutor on the home page (components/home-guide.tsx): a picture beside the
-   sections, never over them. Between 900 and 1360 px the page keeps a margin
-   on the right for it; on a phone it floats small at the top. */
-.home-guide { position: fixed; top: 0; left: 0; width: 104px; height: 104px; z-index: 5;
-  pointer-events: none; will-change: transform; transform-origin: 50% 80%; }
+/* The mascot on the home page (components/home-guide.tsx): a picture beside
+   the sections, on the left and on the right in turn, never over the text.
+   Between 900 and 1320 px the page keeps a margin on both sides for it; on a
+   phone it floats small at the top. */
+.home-guide { position: fixed; top: 0; left: 0; width: 112px; height: 112px; z-index: 5;
+  pointer-events: none; will-change: transform; transform-origin: 50% 90%; }
 .home-guide .face { width: 100%; height: 100%; overflow: visible; }
-@media (min-width: 900px) and (max-width: 1359px) {
-  .page.home.has-guide { padding-right: 140px; }
+@media (min-width: 900px) and (max-width: 1319px) {
+  .page.home.has-guide { padding-left: 156px; padding-right: 156px; }
 }
 @media (max-width: 899px) {
   .page.home { position: relative; }
   .home-guide { position: absolute; top: 12px; right: 8px; left: auto; width: 64px; height: 64px; }
 }
+
+/* Everything that can be clicked shows the hand. */
+a[href], button:not(:disabled), [role="button"], [role="tab"], [role="menuitem"], [role="option"],
+[role="switch"], [role="checkbox"], summary, label[for], select, input[type="checkbox"],
+input[type="radio"], [data-slot="accordion-trigger"], [data-slot="tabs-trigger"],
+[data-slot="select-trigger"], [data-slot="dropdown-menu-item"] { cursor: pointer; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
+
+/* Menus and lists that scroll: a thin, quiet scrollbar. */
+[data-slot="dropdown-menu-content"], .memory-list {
+  scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent;
+}
+
+/* The Tutor's topic, full width at the top of the side panel. */
+.side-topic { padding: 12px 12px 4px; }
+.topic-select { width: 100%; justify-content: flex-start; gap: 8px; }
+.topic-select-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.topic-select-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; color: var(--ink-strong); }
+
+/* Under the microphone: what the system heard, the moment it is known. */
+.voice-col { min-width: 0; display: grid; gap: 6px; }
+.heard-line { margin: 0 20px; min-height: 20px; font-size: 14px; line-height: 20px; color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.heard-line .heard-label { font-weight: 700; color: var(--pri); }
+.heard-line .heard-text { color: var(--ink-strong); }
+.heard-line .heard-none { color: var(--bad); }
+.heard-line .heard-live::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px;
+  border-radius: 50%; background: var(--pri); animation: pulse 1s ease-in-out infinite; vertical-align: middle; }

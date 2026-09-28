@@ -1,8 +1,9 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element, @next/next/no-html-link-for-pages */
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 // The header: the logo, the language being learned and its level on the left;
-// the topic and the grammar syllabus (Tutor only), the pages and the account
-// menu (settings, sign out) on the right.
+// the grammar syllabus (Tutor only), the pages and the account menu (settings,
+// sign out) on the right. The Tutor's topic is picked on its own page
+// (TopicPicker, beside the board).
 
 import Link from "next/link";
 import { ChevronDownIcon, FilePenLine, LogOut, Pencil, Plus, X } from "lucide-react";
@@ -31,20 +32,16 @@ export function Header() {
   const { status, page } = live;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [unitsOpen, setUnitsOpen] = useState(false);
-  const [topicDialog, setTopicDialog] = useState<{ open: boolean; topic: any | null }>({ open: false, topic: null });
 
   const modes = (status.modes || []).filter((m: any) => m.enabled);
   const active = modes.find((m: any) => m.active);
   const g = status.grammar || {};
   const tab = TAB[page] || page;
-  // The Tutor is a page of its own: going in or out of it loads the page afresh.
-  const hard = (target: string) => page === "tutor" || target === "tutor";
-
   return (
     <header className="bar">
-      <a className="brand" href="/" aria-label="langvis.ai - home">
+      <Link className="brand" href="/" aria-label="langvis.ai - home">
         <img className="brand-logo" src="/static/logo-bar.png" alt="langvis.ai" />
-      </a>
+      </Link>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -76,7 +73,6 @@ export function Header() {
 
       {page === "tutor" && (
         <>
-          <TopicMenu onOwn={(t) => setTopicDialog({ open: true, topic: t })} />
           <Button variant="secondary" size="sm" className="topic-pick grammar-pick" id="chip-unit" type="button"
                   title="The whole grammar syllabus and how well you know each rule"
                   onClick={() => setUnitsOpen(true)}>
@@ -90,17 +86,13 @@ export function Header() {
         {NAV.map(({ href, page: p, label, Icon }) => {
           const cls = tab === p ? "active" : "";
           const inner = <><Icon /><span>{label}</span></>;
-          return hard(p)
-            ? <a key={p} href={href} className={cls} title={label}>{inner}</a>
-            : <Link key={p} href={href} className={cls} title={label}>{inner}</Link>;
+          return <Link key={p} href={href} className={cls} title={label}>{inner}</Link>;
         })}
       </nav>
       <UserMenu onSettings={() => setSettingsOpen(true)} />
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <UnitsDialog open={unitsOpen} onOpenChange={setUnitsOpen} />
-      <CustomTopicDialog open={topicDialog.open} topic={topicDialog.topic}
-                         onOpenChange={(open) => setTopicDialog((d) => ({ ...d, open }))} />
     </header>
   );
 }
@@ -132,6 +124,20 @@ function UserMenu({ onSettings }: { onSettings: () => void }) {
   );
 }
 
+// The Tutor's topic, full width above its words: the ready topics (started
+// ones first), and "+ My own topic" - a situation of your own that the tutor
+// turns into a conversation (a scenario can be added to any topic, too).
+export function TopicPicker() {
+  const [dialog, setDialog] = useState<{ open: boolean; topic: any | null }>({ open: false, topic: null });
+  return (
+    <>
+      <TopicMenu onOwn={(t) => setDialog({ open: true, topic: t })} />
+      <CustomTopicDialog open={dialog.open} topic={dialog.topic}
+                         onOpenChange={(open) => setDialog((d) => ({ ...d, open }))} />
+    </>
+  );
+}
+
 // The topic: started topics first, then the rest, then "your own".
 function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
   const { status, send } = useLive();
@@ -140,7 +146,7 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
   const rest = topics.filter((t) => !t.started);
 
   const row = (t: any) => (
-    <div key={t.id} className="flex items-center gap-0.5">
+    <div key={t.id} className="group/row flex items-center gap-0.5 pr-1">
       <DropdownMenuItem className={"flex-1 min-w-0 justify-between " + (t.current ? "bg-accent text-accent-foreground" : "")}
                         onSelect={() => { if (!t.current) send({ type: "topic", id: t.id }); }}>
         <span className="truncate">
@@ -149,13 +155,13 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
         </span>
         <span className="text-xs text-muted-foreground">{t.custom ? "my topic" : ""}</span>
       </DropdownMenuItem>
-      <Button variant="ghost" size="icon-sm" type="button" aria-label={`Scenario for ${t.name}`}
+      <Button variant="quiet" size="icon-sm" type="button" aria-label={`Scenario for ${t.name}`}
               title={t.prompt ? `Scenario: ${t.prompt}` : "Add a scenario for this topic"}
               onClick={(e) => { e.stopPropagation(); onOwn(t); }}>
         {t.prompt ? <FilePenLine /> : <Pencil />}
       </Button>
       {t.started && t.id !== "free" && (
-        <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
+        <Button variant="quiet" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
                 aria-label={`Delete topic ${t.name}`} title={`Delete ${t.name}`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -170,13 +176,14 @@ function TopicMenu({ onOwn }: { onOwn: (topic: any | null) => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="sm" className="topic-pick" id="topic-btn" type="button" title="What we talk about">
+        <Button variant="outline" className="topic-select" id="topic-btn" type="button" title="What we talk about">
           <TopicIcon />
-          <span id="topic-name">{(status.topic || {}).name || "Topic"}</span>
-          <ChevronDownIcon className="size-3.5 opacity-60" />
+          <span className="topic-select-label">Topic</span>
+          <span id="topic-name" className="topic-select-name">{(status.topic || {}).name || "Choose a topic"}</span>
+          <ChevronDownIcon className="size-4 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[290px] max-h-[70vh] overflow-auto">
+      <DropdownMenuContent align="start" className="w-(--radix-dropdown-menu-trigger-width) min-w-[290px] max-h-[70vh] overflow-auto">
         {started.length > 0 && (
           <>
             <DropdownMenuLabel className="text-[11px] tracking-[.08em] uppercase text-muted-foreground">My topics</DropdownMenuLabel>

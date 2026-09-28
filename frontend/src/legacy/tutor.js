@@ -5,7 +5,6 @@
 //           played, and takes the shape of the letter being said (round for
 //           o and u, wide for a, e and i, closed for m, b and p) - the words
 //           in the speech block are typed out at the same pace
-//   cheeks  a light blush, warmer when it talks or grins
 //   eyes    wide listening, narrowed explaining, looking away thinking,
 //           closed asleep; the pupils look at the word it is pointing at
 //   rim     the state colour - green listening, terracotta speaking,
@@ -21,7 +20,6 @@ const BODY = "M250 110 C295 110 360 175 360 220 C360 265 295 330 250 330 " +
              "C205 330 140 265 140 220 C140 175 205 110 250 110 Z";
 const EYE_L = "M190 230 L190 195 C190 178 205 168 220 168 C235 168 242 178 242 195 L242 230 Z";
 const EYE_R = "M258 230 L258 195 C258 178 265 168 280 168 C295 168 310 178 310 195 L310 230 Z";
-const CHEEK = "#f08a74";
 const MOUTH_Y = 248;
 
 // The shape of the mouth for a letter: [width, how far it opens].
@@ -46,9 +44,11 @@ function el(tag, attrs = {}, parent) {
 
 export class TutorFace {
   // `opts.onReveal(text, done)`: the words said so far, as the mouth says them.
+  // `opts.mascot`: the home page's cheerful mascot - happy "^ ^" eyes when it grins.
   constructor(host, audio, opts = {}) {
     this.audio = audio;
     this.onReveal = opts.onReveal || null;
+    this.mascot = !!opts.mascot;
     this.id = ++faces;
     this.full = "";            // the tutor's words of this turn, as far as they have arrived
     this.shownF = 0;           // how many of them have been "said" (typed out)
@@ -102,7 +102,11 @@ export class TutorFace {
       return { g, pupil, glint, cx: left ? 216 : 284, px: left ? 204 : 272 };
     });
     this.dots = [0, 1, 2].map((i) => el("circle", { cx: 214 + i * 36, cy: 86, r: 7, fill: C.think }, this.root));
-    this.cheeks = [182, 318].map((cx) => el("ellipse", { cx, cy: 246, rx: 13, ry: 7.5, fill: CHEEK }, this.root));
+    if (this.mascot) {
+      this.happyEyes = ["M194 208 Q216 184 238 208", "M262 208 Q284 184 306 208"].map((d) =>
+        el("path", { d, fill: "none", stroke: C.ink, "stroke-width": 8, "stroke-linecap": "round",
+                     "stroke-opacity": 0 }, this.root));
+    }
     // The mouth is one path: a smiling line when closed, a smiling open mouth
     // when it talks; the tongue is clipped to it.
     const clip = el("clipPath", { id: `tutor-mouth-${this.id}` }, defs);
@@ -189,7 +193,7 @@ export class TutorFace {
     if (this.muted || this.state === "SLEEPING") target = 0;
     else if (speaking) target = (0.22 + amp * 1.5) * (0.35 + 0.65 * this.shape[1]) * (amp < 0.02 ? 0.3 : 1);
     else if (this.state === "THINKING") target = 0.03;
-    else target = amp * 0.5 + this.grin * 0.3;
+    else target = amp * 0.5 + this.grin * (this.mascot ? 0.55 : 0.3);
     target = Math.max(0, Math.min(1, target));
     this.mouth += (target - this.mouth) * (speaking ? 0.5 : 0.25);
     this.grin *= 0.97;
@@ -246,11 +250,15 @@ export class TutorFace {
     this.rim.setAttribute("stroke-opacity", speaking ? 0.82 : 0.47);
     this.rim.setAttribute("stroke-width", (4 + amp * 7).toFixed(2));
 
+    // The mascot's joy: "^ ^" eyes while it grins.
+    const happy = this.mascot ? Math.max(0, Math.min(1, (this.grin - 0.3) * 2.2)) : 0;
+    if (this.mascot) this.happyEyes.forEach((p) => p.setAttribute("stroke-opacity", happy.toFixed(3)));
     let openY = thinking ? 0.82 : 1;
     if (speaking) openY = 0.88;
     if (this.muted) openY = 0.45;
     openY *= Math.max(0.06, 1 - this.blink);
     for (const eye of this.eyes) {
+      eye.g.setAttribute("opacity", (1 - happy).toFixed(3));
       eye.g.setAttribute("transform",
         `translate(${eye.cx} 199) scale(1 ${openY.toFixed(3)}) translate(${-eye.cx} -199)`);
       const px = eye.px + this.gaze[0];
@@ -269,8 +277,6 @@ export class TutorFace {
       dot.setAttribute("fill-opacity", thinking ? ((70 + lift * 150) / 255).toFixed(3) : 0);
     });
 
-    const warm = this.muted ? 0.12 : 0.3 + amp * 0.35 + this.grin * 0.2;
-    this.cheeks.forEach((c) => c.setAttribute("fill-opacity", warm.toFixed(3)));
 
     const open = this.mouth;
     const sad = this.muted || this.state === "SLEEPING";

@@ -271,13 +271,16 @@ you speak ──▶ thinking ──▶ a mistake?  "Did you mean: …? Say it." 
 
 Beginner speech is slow and has an accent, so LangVis helps the listening side:
 
-- **It waits longer for the end of your sentence.** The pause that ends a
-  sentence follows your level: 1.9 s at A1, 1.6 s at A2, 1.3 s at B1, 1.1 s
-  above - so a pause to find the next word does not cut you off.
-- **The transcriber is told what to expect**: the sentence you were just asked
-  to say and the lesson's words, and that you are a beginner with an accent.
-  It still writes what you really said. Languages other than English use the
-  stronger model.
+- **It lets you talk at length.** The pause that ends a sentence follows your
+  level: 2.4 s at A1, 2.1 s at A2, 1.8 s at B1, 1.6 s above - and the longer
+  you have been talking, the longer a pause to think may be (up to 0.8 s more).
+  If you go on talking while your sentence is being checked, the check is
+  dropped and the whole, longer sentence is heard together. One turn may last a
+  minute.
+- **Only what you really said.** The transcriber knows nothing of the lesson,
+  so it cannot "hear" a fitting answer in noise; noise and typing give nothing.
+  The tutor gets your sentence as text - exactly what you see under the
+  microphone - never the audio.
 - **Repeating is not an echo.** The tutor's own voice coming back through the
   speakers is dropped only when it starts during its speech or right after it.
   You repeating "Say it: prosím" a moment later is you.

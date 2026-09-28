@@ -1327,11 +1327,29 @@ def _asked_to_explain(text: str) -> str | None:
 
 
 def _late() -> bool:
-    """The voice session stopped waiting for this sentence: change nothing."""
+    """The voice session stopped waiting for this sentence - or a newer check
+    has replaced it (they went on talking): change nothing."""
+    if getattr(_gate_local, "gen", _gate_gen[0]) != _gate_gen[0]:
+        return True
     return bool(_gate_deadline[0]) and time.monotonic() > _gate_deadline[0]
 
 
 _gate_deadline = [0.0]
+_gate_gen = [0]                    # the number of the check that counts
+_gate_local = threading.local()    # the number of the check this thread runs
+
+
+def _gate_begin(deadline: float) -> None:
+    _gate_gen[0] += 1
+    _gate_local.gen = _gate_gen[0]
+    _gate_deadline[0] = deadline
+
+
+def cancel_gate() -> None:
+    """The learner went on talking while their sentence was being checked: the
+    check changes nothing any more (every step looks at _late() before it
+    touches the lesson), and the whole, longer sentence is checked instead."""
+    _gate_gen[0] += 1
 
 # Hearing a sentence starts early: when the learner pauses, the model call
 # starts at once, while the pause is still being timed. If they go on talking
@@ -1357,21 +1375,31 @@ def _needs_analysis(seconds: float) -> bool:
     return not (seconds < SHORT_TURN or _turn["phase"] != "free")
 
 
-def _hear(pcm16k: bytes, seconds: float, deadline: float = 0.0) -> dict:
-    """The model call of a sentence: {"text"} or {"text", "result"}, or
-    {"paused": True} when the learner paused the tutor."""
+def _hear(pcm16k: bytes, seconds: float, deadline: float = 0.0, show=None) -> dict:
+    """A sentence heard in two steps: first ONLY its words, by a transcriber
+    that knows nothing of the lesson (so it cannot "hear" a fitting answer in
+    noise), then - for their own sentence - the analysis of those words.
+    {"text"} or {"text", "result", "analysed"}, or {"paused": True}. `show`
+    gets the words the moment they are known (the line under the microphone)."""
     lang = _lang()
-    if not _needs_analysis(seconds):
-        return {"text": an.transcribe(pcm16k, lang["name"], vocabulary=_transcribe_hints(),
-                                      native_language=_native(), deadline=deadline)}
+    text = an.transcribe(pcm16k, lang["name"], native_language=_native(), deadline=deadline,
+                         speech_seconds=seconds)
+    if show is not None:
+        show(text)
+    if not _needs_analysis(seconds) or not an.words(text):
+        return {"text": text}
     with _lock:
         state = _load(lang)
         ctx = _analysis_ctx(state, lang)
         paused = bool(state.get("paused"))
     if paused:
-        return {"paused": True}
-    text, result = an.analyse_audio(pcm16k, deadline=deadline, **ctx)
-    return {"text": text, "result": result, "analysed": True}
+        return {"paused": True, "text": text}
+    return {"text": text, "result": an.analyse(text, **ctx), "analysed": True}
+
+
+def _show_heard(player, text: str) -> None:
+    """What the system heard, under the microphone - or that it heard nothing."""
+    _send(player, {"type": "heard", "text": text or ""})
 
 
 def prehear(key, pcm16k: bytes, seconds: float) -> None:
@@ -1381,7 +1409,7 @@ def prehear(key, pcm16k: bytes, seconds: float) -> None:
         _early.update(key=key, future=fut, analysed=_needs_analysis(seconds))
 
 
-def _heard(pcm16k: bytes, seconds: float, key, deadline: float) -> dict:
+def _heard(pcm16k: bytes, seconds: float, key, deadline: float, show=None) -> dict:
     """The early call's answer when it heard this very sentence, else a new call."""
     with _early_lock:
         fut = _early["future"] if key is not None and _early["key"] == key else None
@@ -1389,10 +1417,13 @@ def _heard(pcm16k: bytes, seconds: float, key, deadline: float) -> dict:
         _early.update(key=None, future=None)
     if fut is not None and same_kind:
         try:
-            return fut.result(timeout=max(0.5, (deadline or time.monotonic() + 10) - time.monotonic()))
+            heard = fut.result(timeout=max(0.5, (deadline or time.monotonic() + 10) - time.monotonic()))
+            if show is not None:
+                show(heard.get("text", ""))
+            return heard
         except Exception as e:
             print(f"[Tutor] early hearing failed ({str(e)[:60]}) - hearing it again")
-    return _hear(pcm16k, seconds, deadline)
+    return _hear(pcm16k, seconds, deadline, show)
 
 
 def _own_version(text: str, player=None) -> dict | None:
@@ -1408,12 +1439,11 @@ def _own_version(text: str, player=None) -> dict | None:
 
 
 def late_note() -> str:
-    """The check of a sentence took too long: the tutor answers what it heard,
-    and stays where the lesson is."""
-    return _next("the check of this sentence did not finish in time. Do NOT start anything new "
-                 "and do NOT change the topic: react to what you heard in ONE short sentence "
-                 "(if you did not understand it, ask them kindly to say it again), then repeat "
-                 "your last question or task. Then STOP and wait.")
+    """Their sentence could not be heard in time: the tutor asks for it again -
+    it never guesses what they said."""
+    return _next("the learner's last sentence could not be heard clearly. Do NOT guess what they "
+                 "said and do NOT answer it: in ONE short, kind sentence ask them to say it again, "
+                 "then STOP and wait.")
 
 
 def expects_repeat(text: str) -> bool:
@@ -1434,10 +1464,10 @@ def gate_audio(pcm16k: bytes, seconds: float, player=None, echo=None,
     global _player
     if player is not None:
         _player = player
-    _gate_deadline[0] = deadline
+    _gate_begin(deadline)
     lang = _lang()
     try:
-        heard = _heard(pcm16k, seconds, early_key, deadline)
+        heard = _heard(pcm16k, seconds, early_key, deadline, show=lambda t: _show_heard(player, t))
         if not heard.get("analysed") and not heard.get("paused"):
             text = heard["text"]
             if not an.words(text):
@@ -1494,7 +1524,7 @@ def gate_audio(pcm16k: bytes, seconds: float, player=None, echo=None,
 def gate_text(text: str, player=None) -> dict:
     """The same decision for a typed sentence."""
     global _player
-    _gate_deadline[0] = 0.0
+    _gate_begin(0.0)
     if player is not None:
         _player = player
     text = (text or "").strip()
@@ -2402,25 +2432,6 @@ def _intensive_status() -> dict:
             "weeks": course.get("weeks", [])}
 
 
-OWN_ANSWER_STEPS = ("review", "translate", "build", "questions", "frames")
-
-
-def _transcribe_hints() -> list[str] | None:
-    """Spelling help for the transcriber - only while the learner repeats
-    what they were just given. When the answer is their own (a question about
-    their life, a translation, a word to recall), a list of likely words makes
-    the transcriber hear the list instead of the learner."""
-    teach = _turn.get("teach") or {}
-    steps = teach.get("steps") or []
-    i = int(teach.get("i", 0))
-    if _turn.get("phase") != "teach" or not steps or i >= len(steps):
-        return None
-    step = steps[i]
-    if step.get("open") or step["kind"] in OWN_ANSWER_STEPS:
-        return None
-    return _hint_words()
-
-
 def _hint_words() -> list[str]:
     """The words the learner is most likely saying now - handed to the
     transcriber so a beginner's accent is heard as the right word."""
@@ -2461,15 +2472,16 @@ def _intensive_deck(state: dict) -> tuple[dict, list]:
 
 
 def end_silence() -> float:
-    """Seconds of quiet that end the learner's sentence. A beginner stops to
-    find the next word, so the lower the level, the longer the wait."""
+    """Seconds of quiet that end the learner's sentence. A learner stops to
+    think and to find the next word - they must be able to talk at length -
+    so the wait is generous, and longer the lower the level."""
     try:
         lang = _lang()
         with _lock:
             level = _teach_level(_load(lang), lang)
     except Exception:
-        return 1.1
-    return {"A1": 1.9, "A2": 1.6, "B1": 1.3}.get(level, 1.1)
+        return 1.6
+    return {"A1": 2.4, "A2": 2.1, "B1": 1.8}.get(level, 1.6)
 
 
 def _course_card(key: str, name: str, levels: str, c: dict) -> dict:

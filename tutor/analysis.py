@@ -208,7 +208,7 @@ def _rest_for(err: str) -> float | None:
 # The learner is waiting while these calls run, so they are made for speed:
 # no long thinking (a transcript or a sentence check needs none), a short
 # timeout, and a second model started in parallel when the first is slow.
-FAST_TIMEOUT_MS = 9000            # one fast call; the voice session waits ~10 s in total
+FAST_TIMEOUT_MS = 10000           # one fast call (the API refuses less than 10 s); slow ones are hedged anyway
 HEDGE_AFTER = 3.5                 # s before a slow fast call gets a second model beside it
 # How each model is told to think little. Gemini 3 models take a thinking
 # level, older ones a budget; a model that refuses one style gets the next.
@@ -741,37 +741,48 @@ def analyse_audio(pcm16k: bytes, deadline: float = 0.0, **ctx) -> tuple[str, dic
     return text, _finish(data, text, ctx["skills"])
 
 
+NO_SPEECH = "-"                   # what the transcriber answers when nobody spoke
+MAX_WORDS_PER_SECOND = 4.0        # more words than this from the speech heard: invented
+
+
 def transcribe(pcm16k: bytes, language_name: str = "English", expected: str = "",
                vocabulary: list[str] | None = None, native_language: str = "",
-               deadline: float = 0.0) -> str:
-    """Only the words - for a repeat, where there is nothing new to analyse.
+               deadline: float = 0.0, speech_seconds: float = 0.0) -> str:
+    """Exactly the words a person said - and nothing when nobody spoke.
 
-    A beginner's accent is hard to hear, so for a repeat the transcriber may be
-    given the lesson's words - for spelling only. It is never told the sentence
-    the learner was asked to say: told that, it writes the expected sentence
-    instead of what was said ("Bývam v Prešove" came out as "Bývam v
-    Bratislave"), and every answer looks right. `expected` is kept for old
-    callers and ignored. A language other than English goes to the stronger
-    model: the light one hears beginner Slovak badly."""
-    hints = []
-    if vocabulary:
-        hints.append("Words from their lesson, ONLY to help with spelling (never write one "
-                     "that was not clearly spoken): " + ", ".join(vocabulary[:40]) + ".")
+    The transcriber gets NO context at all: not the tutor's question, not the
+    topic, not the lesson's words. Given context, a model hearing a keyboard
+    or a breath "hears" the answer that would fit ("I had a busy day") - the
+    learner must only ever see what they really said. `expected` and
+    `vocabulary` are kept for old callers and ignored. `speech_seconds`: how
+    long the voice was loud - a transcript with far more words than that can
+    hold was invented, and is thrown away. A language other than English goes
+    to the stronger model: the light one hears beginner Slovak badly."""
     prompt = (
-        f"Transcribe this audio. The speaker is a beginner learner of {language_name}"
+        "Transcribe the words a person speaks in this audio, exactly as spoken, word for word. "
+        f"They are learning {language_name}"
         + (f" (native language {native_language})" if native_language else "")
-        + ", with an accent and slow, careful speech. " + " ".join(hints)
-        + f" Write exactly what they really said, word for word. Spell {language_name} words "
-        f"correctly, with all diacritics. Names of places and people exactly as heard. Keep "
-        "their grammar mistakes and missing words, never correct or complete the sentence. "
-        f"They speak {language_name}; only when they clearly switch to "
+        + f" and speak slowly, with an accent. Spell {language_name} words correctly, with all "
+        "diacritics; keep their grammar mistakes and missing words; never correct, complete or "
+        f"add anything. If they clearly switch to "
         + (f"{native_language} or " if native_language else "")
-        + "English, write that as said. NEVER turn their words into French, Spanish, Italian "
-        f"or any other language - an unclear word is the closest {language_name} word. "
+        + "English, write that as said; never turn their words into French, Spanish, Italian or "
+        "any other language. If there is NO clear human speech - silence, noise, typing, clicks, "
+        f"breathing, music - answer exactly {NO_SPEECH} and nothing else. Never guess. "
         "Return only the words.")
     model = ANALYSIS_MODEL if language_name == "English" else LESSON_MODEL
-    return gemini_fast(prompt, model=model, audio_wav=pcm_to_wav(pcm16k),
-                       deadline=deadline).strip().strip('"')
+    text = gemini_fast(prompt, model=model, audio_wav=pcm_to_wav(pcm16k),
+                       deadline=deadline).strip().strip('"').strip()
+    # Tags for sounds ("[noise]", "<typing>", "(silence)") are not words.
+    text = re.sub(r"\[[^\]]*\]|<[^>]*>|\((?:noise|silence|none|inaudible|music|typing|breathing)[^)]*\)",
+                  " ", text, flags=re.IGNORECASE)
+    text = " ".join(text.split())
+    if not words(text) or text.lower() in (NO_SPEECH, "none", "no speech", "silence"):
+        return ""
+    if speech_seconds and len(words(text)) > speech_seconds * MAX_WORDS_PER_SECOND + 3:
+        print(f"[Analysis] too many words for {speech_seconds:.1f}s of speech - dropped: {text[:60]}")
+        return ""
+    return text
 
 
 def analyse(text: str, **ctx) -> dict:

@@ -245,14 +245,15 @@ class _Vad:
     to find words, so a sentence ends only after a real silence."""
 
     START_LEVEL = 550         # RMS of int16 samples
-    STOP_LEVEL = 380
+    STOP_LEVEL = 300           # softer syllables still count as speech
     START_BLOCKS = 2          # this many loud blocks in a row start a sentence (~130 ms)
     # Cutting in while the tutor speaks: its own voice is mostly cancelled by
     # the browser, but what is left must not count as the learner.
     BARGE_LEVEL = 1300
     BARGE_BLOCKS = 6          # ~380 ms of clear speech
-    END_SILENCE = 1.1         # seconds of quiet that end it
-    MAX_SECONDS = 30.0
+    END_SILENCE = 1.6         # seconds of quiet that end it (set per level by the tutor)
+    LONG_BONUS = 0.8          # up to this much longer after a long stretch of talking
+    MAX_SECONDS = 60.0        # one turn may be a long story
     BLOCK_SECONDS = 1024 / 16000
     PREROLL = 5               # quiet blocks kept from before the start (~320 ms)
 
@@ -319,9 +320,15 @@ class _Vad:
             self._speech += self.BLOCK_SECONDS
             self._last_loud = len(self._chunks) - 1
         total = len(self._chunks) * self.BLOCK_SECONDS
-        if self._quiet >= self.END_SILENCE or total >= self.MAX_SECONDS:
+        if self._quiet >= self.end_after() or total >= self.MAX_SECONDS:
             return "end"
         return None
+
+    def end_after(self) -> float:
+        """The quiet that ends this sentence: the longer they have talked, the
+        longer a pause to think may be (0.04 s more per second, at most
+        LONG_BONUS)."""
+        return self.END_SILENCE + min(self.LONG_BONUS, self._speech * 0.04)
 
     def heard(self) -> list[bytes]:
         """Everything heard so far, from just before the start."""
@@ -384,6 +391,10 @@ class LiveSession:
         self._drop_rest = False        # a tool call ended a spoken turn: the rest is not said
         self._words_gen = 0            # an Interrupt makes words still on their way stale
         self._early_key = None         # the sentence an early hearing was started for
+        self._last_sentence: tuple[bytes, bytes, float] | None = None
+        # A sentence whose check was cancelled because the learner went on
+        # talking: it is put in front of what they say next.
+        self._carry: tuple[bytes, bytes, float] | None = None
         self._timing: dict | None = None   # when this turn's steps happened, for the speed log
         self._live_thinking = True     # the voice model is asked to think little (off if it refuses)
         self._connect_fails = 0        # connections in a row that failed before "Connected"
@@ -563,14 +574,18 @@ class LiveSession:
         with self._speaking_lock:
             speaking = self._is_speaking
         now = time.monotonic()
-        closed = (self.ui.muted or now < self._open_at or now < self._reply_until
-                  or (self._gate_task is not None and not self._gate_task.done()))
+        checking = self._gate_task is not None and not self._gate_task.done()
+        closed = self.ui.muted or now < self._open_at or now < self._reply_until
         if closed:
             self._vad.reset()               # muted mid-sentence: drop it cleanly
             return
 
         barge = speaking or now < self._quiet_until
         event = self._vad.feed(np.frombuffer(pcm16k, dtype=np.int16), barge=barge)
+        if event == "start" and checking:
+            # They go on talking while the last part is being checked: that
+            # check is dropped and this becomes the rest of the same sentence.
+            self._continue_sentence()
         if event == "start":
             self._utt_barge = barge or now < self._echo_until
             self._utt_gap = -1.0 if speaking else now - self._speech_end
@@ -585,13 +600,36 @@ class LiveSession:
         if event == "end":
             self.ui.send({"type": "hearing", "value": False})
             utterance, spoken, seconds, key = self._vad.take()
-            early = key if key == self._early_key else None
+            early = key if key == self._early_key and self._carry is None else None
             self._early_key = None
+            if self._carry is not None:
+                before, before_spoken, before_seconds = self._carry
+                self._carry = None
+                utterance, spoken = before + utterance, before_spoken + spoken
+                seconds += before_seconds
             self._timing = {"end": now, "early": early is not None}
             self._gate_task = asyncio.get_running_loop().create_task(
                 self._think_then_answer(utterance, seconds, spoken, early))
             return
         self._maybe_hear_early()
+
+    def _continue_sentence(self) -> None:
+        """Cancel the check of the sentence so far and keep it, so that what
+        they say now is heard together with it."""
+        task, self._gate_task = self._gate_task, None
+        cancel = plugin_fn("cancel_gate")
+        if cancel is not None:
+            try:
+                cancel()
+            except Exception:
+                pass
+        if task is not None:
+            task.cancel()
+        if self._last_sentence is not None:
+            self._carry = self._last_sentence
+        self._timing = None
+        self.ui.set_state("LISTENING")
+        print("[LangVis] they went on talking - the sentence continues")
 
     def _maybe_hear_early(self) -> None:
         """The learner has paused long enough that this may be the end of the
@@ -599,7 +637,9 @@ class LiveSession:
         vad = self._vad
         if not vad.active or vad.speech < 0.3:
             return
-        if vad.quiet < max(EARLY_MIN, vad.END_SILENCE * EARLY_SHARE) or vad.key() == self._early_key:
+        if self._carry is not None:
+            return                          # a continued sentence is heard as a whole
+        if vad.quiet < max(EARLY_MIN, vad.end_after() * EARLY_SHARE) or vad.key() == self._early_key:
             return
         prehear = plugin_fn("prehear")
         if prehear is None:
@@ -629,6 +669,10 @@ class LiveSession:
             elif "note" in msg:
                 await self.session.send_client_content(
                     turns={"role": "user", "parts": [{"text": msg["note"]}]}, turn_complete=False)
+            elif "say" in msg:
+                # The learner's turn, complete: now the tutor answers.
+                await self.session.send_client_content(
+                    turns={"role": "user", "parts": [{"text": msg["say"]}]}, turn_complete=True)
             else:
                 await self.session.send_realtime_input(
                     audio=types.Blob(data=msg["data"], mime_type="audio/pcm;rate=16000"))
@@ -640,7 +684,9 @@ class LiveSession:
         silence (what the checker hears); `early` the key of an early hearing
         of it that is already running."""
         gate = plugin_fn("gate_audio")
-        note, handled = None, False
+        note, handled, heard = None, False, ""
+        # Kept while it is checked: if they go on talking, it is put in front.
+        self._last_sentence = (utterance, spoken or utterance, seconds)
         if seconds < 0.3:
             self.ui.set_state("LISTENING")
             return                          # a click or a breath, not a sentence
@@ -686,16 +732,35 @@ class LiveSession:
                 print(f"[LangVis] thinking failed: {e}")
         if self._timing is not None:
             self._timing["checked"] = time.monotonic()
+        if gate is not None and not heard:
+            if not note:
+                # Nothing clear was heard (noise, typing, a failed check): the
+                # tutor says nothing - it never answers something not said.
+                self.ui.set_state("LISTENING")
+                self.ui.send({"type": "hearing", "value": None})
+                return
+            # Too slow to hear it: the tutor only asks them to say it again.
+            self._expect_reply()
+            self._queue({"say": note})
+            self._reply_until = time.monotonic() + REPLY_WAIT
+            return
         self._gated_turn = handled
         self.ui.hold_live = handled         # the board already shows the sentence
-        # The whole sentence goes to the model at once, with the decided reply.
-        self._queue({"activity": "start"})
-        for i in range(0, len(utterance), SEND_CHUNK):
-            self._queue({"data": utterance[i:i + SEND_CHUNK]})
-        if note:
-            self._queue({"note": note})
         self._expect_reply()
-        self._queue({"activity": "end"})
+        if gate is not None:
+            # The model gets the sentence AS HEARD, as text - exactly what the
+            # learner sees - and not the audio: it must not hear its own,
+            # different version of it.
+            if note:
+                self._queue({"note": note})
+            self._queue({"say": heard})
+            if not handled:
+                self._observe_turn(heard)   # counted like before (the model sends no transcript now)
+        else:
+            self._queue({"activity": "start"})
+            for i in range(0, len(utterance), SEND_CHUNK):
+                self._queue({"data": utterance[i:i + SEND_CHUNK]})
+            self._queue({"activity": "end"})
         self._reply_until = time.monotonic() + REPLY_WAIT
 
     def _echo_of(self, heard: str) -> bool:

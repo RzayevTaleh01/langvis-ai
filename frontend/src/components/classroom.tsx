@@ -8,13 +8,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Board } from "@/legacy/board.js";
 import { TutorFace, TutorWalker } from "@/legacy/tutor.js";
-import { useLive } from "@/components/live-provider";
+import { useLive, type Heard } from "@/components/live-provider";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   KeyboardIcon, MicOffIcon, MicOnIcon, PlayIcon, RestartIcon, SendIcon, SkipIcon, StopIcon,
 } from "@/components/icons";
 import { CourseSide } from "@/components/course-side";
+import { TopicPicker } from "@/components/header";
 import { Button } from "@/components/ui/button";
 
 export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
@@ -141,7 +142,7 @@ export function Classroom({ kind }: { kind: "lesson" | "tutor" }) {
         </div>
       </section>
 
-      <SidePanel />
+      <SidePanel kind={kind} />
       <Controls />
     </main>
   );
@@ -162,8 +163,11 @@ function Notice() {
 
 // ── The side panel: the words of the topic or lesson, and the transcript ─────
 
-function SidePanel() {
+function SidePanel({ kind }: { kind: "lesson" | "tutor" }) {
   const live = useLive();
+  // The Tutor's words appear once the conversation has started on this page.
+  const [talked, setTalked] = useState(false);
+  if (live.started && !talked) setTalked(true);      // stays true after a Stop
   const [tab, setTab] = useState<"words" | "transcript">("words");
   const [asked, setAsked] = useState<string>("");
   const paneRef = useRef<HTMLDivElement>(null);
@@ -173,7 +177,9 @@ function SidePanel() {
   const due: any[] = card.due || [];
   const lex = card.lexis || {};
   const learned = items.filter((i) => i.stage >= 3).length;
-  const head = !live.status.lexicon_ready && !deck.intensive
+  const waiting = kind === "tutor" && !deck.intensive && !talked;
+  const head = waiting ? "There are no words yet - start talking and the words of your topic appear here."
+    : !live.status.lexicon_ready && !deck.intensive
     ? (live.status.lexicon_building ? `Preparing the words for ${(live.status.topic || {}).name}… (once only)`
                                     : "The topic's words are on their way…")
     : items.length
@@ -194,6 +200,7 @@ function SidePanel() {
 
   return (
     <aside className="side">
+      {kind === "tutor" && <div className="side-topic"><TopicPicker /></div>}
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="gap-0">
         <TabsList variant="line" className="gap-0">
           <TabsTrigger value="words" className="flex-1 px-2.5! text-[13px]!">
@@ -204,12 +211,12 @@ function SidePanel() {
       <div className={"pane" + (tab === "words" ? "" : " hidden")} id="pane-words">
         <div className="pane-head" id="words-head">{head}</div>
         <ul className="words" id="words">
-          {items.map((it) => <WordRow key={it.text} it={it} asked={asked === it.text} onClick={() => explain(it.text)} />)}
+          {!waiting && items.map((it) => <WordRow key={it.text} it={it} asked={asked === it.text} onClick={() => explain(it.text)} />)}
         </ul>
-        <div className={"label small" + (due.length ? "" : " hidden")} id="due-label">
+        <div className={"label small" + (due.length && !waiting ? "" : " hidden")} id="due-label">
           {deck.intensive ? "From earlier lessons - review" : "Old words - use them again"}</div>
         <ul className="words due" id="due">
-          {due.map((it) => <WordRow key={it.text} it={it} asked={false}
+          {!waiting && due.map((it) => <WordRow key={it.text} it={it} asked={false}
                                     onClick={() => live.send({ type: "explain", item: { kind: "word", text: it.text } })} />)}
         </ul>
       </div>
@@ -242,6 +249,17 @@ function WordRow({ it, onClick, asked }: { it: any; onClick: () => void; asked: 
       )}
     </li>
   );
+}
+
+// What the system heard - right under the microphone, the moment it is known:
+// the learner sees exactly what the tutor will answer.
+function HeardLine({ started, heard }: { started: boolean; heard: Heard }) {
+  let body: React.ReactNode = "What you say is written here - exactly as the system hears it.";
+  if (started && heard.kind === "listening") body = <span className="heard-live">Listening…</span>;
+  else if (started && heard.kind === "checking") body = <span className="heard-live">Checking what you said…</span>;
+  else if (heard.kind === "text") body = <><span className="heard-label">Heard:</span> <span className="heard-text">{heard.text}</span></>;
+  else if (heard.kind === "none") body = <span className="heard-none">Nothing clear heard - please say it again.</span>;
+  return <p className={"heard-line " + heard.kind} aria-live="polite">{body}</p>;
 }
 
 // ── The controls: the microphone and your voice as a wave, typing, interrupt ─
@@ -322,6 +340,7 @@ function Controls() {
 
   return (
     <footer className="controls">
+      <div className="voice-col">
       <div className={"voicebar" + (typing ? " hidden" : "")} id="voicebar">
         <button className="mic-toggle" id="mic" type="button" aria-pressed={!live.muted} aria-label="Microphone"
                 title={live.muted ? "Microphone off - click to turn it on (F4)" : "Microphone on - click to turn it off (F4)"}
@@ -331,6 +350,8 @@ function Controls() {
         </button>
         <canvas id="wave" aria-hidden="true" ref={wave} />
         <span className="voice-hint" id="voice-hint" ref={hint}>Just talk - I&apos;m listening</span>
+      </div>
+      <HeardLine started={live.started} heard={live.heard} />
       </div>
       <form className={"compose" + (typing ? "" : " hidden")} id="compose"
             onSubmit={(e) => {

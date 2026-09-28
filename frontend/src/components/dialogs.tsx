@@ -119,7 +119,7 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
               get one free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</p>
             <ul className="memory-list">
               {keys.map((k) => (
-                <li key={k.id}>
+                <li key={k.id} className="group/row">
                   <div>
                     <div className={"mem-key" + (k.main ? " key-main" : "")}>{k.main ? "main key" : "extra key"}</div>
                     <div className="mem-value">{k.masked}</div>
@@ -127,7 +127,7 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
                   {!k.main && (
                     <div className="key-actions">
                       <Button variant="link" size="sm" type="button" onClick={() => keyAction({ action: "main", id: k.id })}>make main</Button>
-                      <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
+                      <Button variant="quiet" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
                               title="Remove this key" aria-label={`Remove key ${k.masked}`}
                               onClick={() => keyAction({ action: "remove", id: k.id })}><TrashIcon /></Button>
                     </div>
@@ -160,12 +160,12 @@ export function SettingsDialog({ open, onOpenChange }: OpenProps) {
             <ul className="memory-list">
               {!shown.length && <li>{memory.length ? "Nothing matches." : "Nothing remembered yet."}</li>}
               {shown.map((r) => (
-                <li key={`${r.category}/${r.key}`}>
+                <li key={`${r.category}/${r.key}`} className="group/row">
                   <div>
                     <div className="mem-key">{`${r.category} · ${r.key.replace(/_/g, " ")}`}</div>
                     <div className="mem-value">{r.value}</div>
                   </div>
-                  <Button variant="ghost" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
+                  <Button variant="quiet" size="icon-sm" type="button" className="hover:bg-[var(--bad-ghost)] hover:text-[var(--bad)]!"
                           title="Forget this" aria-label={`Forget ${r.key}`}
                           onClick={async () => {
                             const res = await postJson("/api/memory/forget", { category: r.category, key: r.key });
