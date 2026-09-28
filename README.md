@@ -77,12 +77,13 @@ Then:
 
 ## A short tour
 
-The home page explains LangVis and shows the courses. The mascot walks beside
-the text as you scroll.
+The home page explains LangVis and shows the courses; the mascot walks beside
+the text as you scroll. Signed in, it greets you and takes you back to your
+course or to the Tutor.
 
-![Home](docs/screenshots/01-home.png)
-
-![The courses on the home page](docs/screenshots/02-home-courses.png)
+| Home | The courses | Signed in |
+|---|---|---|
+| ![Home](docs/screenshots/01-home.png) | ![The courses on the home page](docs/screenshots/02-home-courses.png) | ![Home, signed in](docs/screenshots/06-home-signed-in.png) |
 
 Signing up and logging in are friendly: the mascot says hello to your name,
 watches your email being typed, and closes its eyes while you type your
@@ -93,25 +94,18 @@ password is wrong it is sad.
 |---|---|---|
 | ![Sign up](docs/screenshots/03-sign-up.png) | ![Log in](docs/screenshots/04-log-in.png) | ![Signed in](docs/screenshots/05-signed-in.png) |
 
-After signing in, the home page greets you and takes you back to your course
-or to the Tutor.
-
-![Home, signed in](docs/screenshots/06-home-signed-in.png)
-
 ---
 
 ## Courses
 
 A course is a fixed path of lessons for one language and level. The teacher
 follows it step by step, never skips anything, and remembers exactly where you
-stopped. A language can have more than one course; they show as tabs.
+stopped. A language can have more than one course; they show as tabs. The
+syllabus shows every week and lesson: its words, grammar, parts and speaking task.
 
-![The Courses page](docs/screenshots/07-courses.png)
-
-The syllabus shows every week and lesson: its words, its grammar point, its
-parts and its speaking task.
-
-![The syllabus](docs/screenshots/08-syllabus.png)
+| The Courses page | The syllabus |
+|---|---|
+| ![The Courses page](docs/screenshots/07-courses.png) | ![The syllabus](docs/screenshots/08-syllabus.png) |
 
 | Course | Levels | Size |
 |---|---|---|
@@ -133,15 +127,13 @@ must be there (small slips and accents are forgiven, names may be your own).
 If it is not right, you hear it again once - then the lesson goes on, so you
 never get stuck.
 
-![A wrong repeat: "Again"](docs/screenshots/10-lesson-again.png)
-
-![A grammar point](docs/screenshots/11-lesson-grammar.png)
-
 The **small talk method** is practised in every small talk lesson: never give
 a one-word answer. React, answer, add one small detail, and ask back. The
 "Longer sentences" part shows one answer growing step by step.
 
-![A sentence growing longer](docs/screenshots/12-lesson-longer.png)
+| A wrong repeat: "Again" | A grammar point | A sentence growing longer |
+|---|---|---|
+| ![A wrong repeat](docs/screenshots/10-lesson-again.png) | ![A grammar point](docs/screenshots/11-lesson-grammar.png) | ![A sentence growing longer](docs/screenshots/12-lesson-longer.png) |
 
 **Every word is taught before it is asked for.** Each lesson's word list holds
 every word the learner has to say in it; in the free speaking part the teacher
@@ -153,47 +145,38 @@ may only use what the course has taught so far - a new word is taught first.
 
 The Tutor is free conversation - your own teacher, ready for whatever you
 need: talk about anything, ask about a word or a rule, get ready for a trip or
-an interview.
+an interview. Choose a **topic** at the top of the side panel - or write
+**your own scenario** ("be a barista, I am the customer") and the tutor builds
+the conversation around it. The topic's words fill the side panel once you start.
 
-![The Tutor before Start](docs/screenshots/13-tutor.png)
-
-Choose a **topic** at the top of the side panel - or write **your own
-scenario** ("be a barista, I am the customer") and the tutor builds the
-conversation around it. The topic's words fill the side panel once you start.
-
-![Topics](docs/screenshots/14-tutor-topics.png)
+| The Tutor before Start | Topics and your own scenario |
+|---|---|
+| ![The Tutor before Start](docs/screenshots/13-tutor.png) | ![Topics](docs/screenshots/14-tutor-topics.png) |
 
 A sentence with mistakes is corrected once, kindly: the board underlines the
 mistakes, shows the corrected sentence and why, and offers a better way to say
-it one level up. "You can say" gives ideas for your next answer. Under the
-microphone you always see **exactly what the system heard**.
+it one level up; "You can say" gives ideas for your next answer. Ask about any
+grammar ("Can you explain the past simple?") and the rule is drawn on the
+board. Under the microphone you always see **exactly what the system heard**.
 
-![A correction](docs/screenshots/15-tutor-correction.png)
-
-Ask about any grammar ("Can you explain the past simple?") and the rule is
-drawn on the board, with a picture, the forms and your own mistakes - then you
-practise it.
-
-![Grammar on the board](docs/screenshots/16-tutor-grammar.png)
+| A correction | Grammar on the board |
+|---|---|
+| ![A correction](docs/screenshots/15-tutor-correction.png) | ![Grammar on the board](docs/screenshots/16-tutor-grammar.png) |
 
 ---
 
 ## Account, Dictionary and Grammar
 
-**Account** - your level over time, how your dictionary grows, your mistakes
-per day, where they are, and every correction ever made.
+- **Account** - your level over time, how your dictionary grows, your mistakes
+  per day, where they are, and every correction ever made.
+- **Dictionary** - every word and phrase you met: how often and on how many
+  different days you used it. A word comes back in your lessons until it is yours.
+- **Grammar** - every rule from A1 to B2 and how well you know it, measured from
+  what you actually say. Click a rule to see your own mistakes and the rule.
 
-![Account](docs/screenshots/17-account.png)
-
-**Dictionary** - every word and phrase you met: how often and on how many
-different days you used it. A word comes back in your lessons until it is yours.
-
-![Dictionary](docs/screenshots/18-dictionary.png)
-
-**Grammar** - every rule from A1 to B2 and how well you know it, measured from
-what you actually say. Click a rule to see your own mistakes and the rule.
-
-![Grammar](docs/screenshots/19-grammar.png)
+| Account | Dictionary | Grammar |
+|---|---|---|
+| ![Account](docs/screenshots/17-account.png) | ![Dictionary](docs/screenshots/18-dictionary.png) | ![Grammar](docs/screenshots/19-grammar.png) |
 
 ---
 
