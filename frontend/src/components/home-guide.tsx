@@ -180,7 +180,20 @@ export function PageGuide({ hello = "" }: { hello?: string }) {
       x += dx * (1 - Math.exp(-dt * 4));      // a smooth glide - no hops, no jumps
       y += dy * (1 - Math.exp(-dt * 5));
       node.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
-      node.classList.toggle("on-right", x + size / 2 > vw / 2);
+      // Its bubble reaches away from the content (outwards), and only moves in
+      // as far as the edge of the screen makes it.
+      if (bubble) {
+        // Only as wide as the free space beside the content: it wraps rather
+        // than covering the page.
+        const room = left ? text.left - 24 : vw - text.right - 24;
+        bubble.style.maxWidth = `${Math.round(clamp(room, 140, 210))}px`;
+        const bw = bubble.offsetWidth;
+        const outer = x + size / 2 < vw / 2;
+        let at = outer ? size - bw : 0;
+        at = Math.max(12 - x, Math.min(vw - 12 - bw - x, at));
+        bubble.style.left = `${at.toFixed(0)}px`;
+        bubble.style.setProperty("--tail", `${(size / 2 - at).toFixed(0)}px`);
+      }
       // It looks towards the content - or where it walks.
       const walking = Math.abs(dx) > 3 || Math.abs(dy) > 3;
       const toText = Math.abs(dx) > 20 ? Math.sign(dx) * 0.9 : x + size / 2 < vw / 2 ? 0.85 : -0.85;

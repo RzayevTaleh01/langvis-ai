@@ -177,7 +177,9 @@ function SidePanel({ kind }: { kind: "lesson" | "tutor" }) {
   const due: any[] = card.due || [];
   const lex = card.lexis || {};
   const learned = items.filter((i) => i.stage >= 3).length;
-  const waiting = kind === "tutor" && !deck.intensive && !talked;
+  // The Tutor never shows a course lesson's words (the course may still be the
+  // section in use until Start): its own words come once the talk has started.
+  const waiting = kind === "tutor" && (deck.intensive || !talked);
   const head = waiting ? "There are no words yet - start talking and the words of your topic appear here."
     : !live.status.lexicon_ready && !deck.intensive
     ? (live.status.lexicon_building ? `Preparing the words for ${(live.status.topic || {}).name}… (once only)`
@@ -204,7 +206,7 @@ function SidePanel({ kind }: { kind: "lesson" | "tutor" }) {
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="gap-0">
         <TabsList variant="line" className="gap-0">
           <TabsTrigger value="words" className="flex-1 px-2.5! text-[13px]!">
-            {deck.intensive ? "Lesson words" : "Topic words"}</TabsTrigger>
+            {deck.intensive && kind === "lesson" ? "Lesson words" : "Topic words"}</TabsTrigger>
           <TabsTrigger value="transcript" className="flex-1 px-2.5! text-[13px]!">Transcript</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -351,8 +353,6 @@ function Controls() {
         <canvas id="wave" aria-hidden="true" ref={wave} />
         <span className="voice-hint" id="voice-hint" ref={hint}>Just talk - I&apos;m listening</span>
       </div>
-      <HeardLine started={live.started} heard={live.heard} />
-      </div>
       <form className={"compose" + (typing ? "" : " hidden")} id="compose"
             onSubmit={(e) => {
               e.preventDefault();
@@ -364,6 +364,8 @@ function Controls() {
                aria-label="Type a sentence" value={text} onChange={(e) => setText(e.target.value)} />
         <Button size="icon" type="submit" title="Send" aria-label="Send"><SendIcon /></Button>
       </form>
+      <HeardLine started={live.started} heard={live.heard} />
+      </div>
       <div className="control-buttons">
         <Button variant={typing ? "default" : "outline"} size="icon" id="keyboard-btn" type="button" className="size-11"
                 title="Type a message instead" aria-label="Type a message" onClick={() => setTyping((t) => !t)}>

@@ -1,33 +1,34 @@
 <p align="center"><img src="docs/logo.png" alt="langvis.ai" width="320"></p>
 
-**A speaking language teacher in your browser.**
-LangVis talks with you by voice and checks every sentence before it answers.
-It has two sides: **Courses**, where a teacher takes you through fixed course
-material step by step, and the **Tutor**, where you talk freely about anything
-and ask about any grammar or word.
+**An AI language teacher you talk to.**
+LangVis teaches a language by voice, in your browser. You speak, it writes down
+exactly what you said, checks it, shows your mistakes on a board, and answers -
+like a patient teacher sitting next to you. It works for any level from your
+first words (A1) to fluent speech (C1).
 
-![A course lesson on the board](docs/screenshots/03-course-words.png)
+![A course lesson on the board](docs/screenshots/09-lesson-words.png)
 
 | | |
 |---|---|
-| **Languages** | English · Slovak - switched in the header, each with its own level and progress |
-| **Courses** | Slovak A1 → B1 (30 lessons, 6 weeks) · Slovak A1 → A2 small talk (28 lessons, 7 weeks) · English A2 → B1+ phrasal verbs for daily speaking (20 lessons, 5 weeks) · English A2 → B1 small talk (20 lessons, 5 weeks) |
-| **Tutor** | free conversation: 13 topics + your own, or free talk; grammar on the board whenever you ask |
+| **Two ways to learn** | **Courses** - step-by-step lessons, week by week · **Tutor** - free conversation about anything |
+| **Languages** | English and Slovak today (each with its own level and progress); new languages and courses can be added |
+| **Courses** | English small talk (A2 → B1) · English phrasal verbs (A2 → B1+) · Slovak small talk (A1 → A2) · Slovak from zero (A1 → B1) |
 | **Voice** | real-time two-way audio through the Gemini Live API |
-| **Platform** | Python server + any modern browser · Windows, macOS, Linux |
+| **Your progress** | level over time, every mistake, a dictionary of every word, 71 grammar rules |
+| **Platform** | Python server + a Next.js page in any modern browser · Windows, macOS, Linux |
 
 ---
 
 ## Contents
 
 - [Quick start](#quick-start)
-- [Courses and Tutor](#courses-and-tutor)
-- [Tutor - free conversation](#tutor---free-conversation)
-- [Courses - learning from zero](#courses---learning-from-zero)
-- [How one sentence is checked](#how-one-sentence-is-checked)
-- [Hearing a beginner](#hearing-a-beginner)
+- [A short tour](#a-short-tour)
+- [Courses](#courses)
+- [Tutor](#tutor)
 - [Account, Dictionary and Grammar](#account-dictionary-and-grammar)
-- [Languages and explanations](#languages-and-explanations)
+- [How the system works](#how-the-system-works)
+- [The mascot](#the-mascot)
+- [Languages and levels](#languages-and-levels)
 - [What is saved](#what-is-saved)
 - [Project structure](#project-structure)
 - [Extending LangVis](#extending-langvis)
@@ -49,370 +50,301 @@ python setup.py
 python main.py
 ```
 
-`docker compose up -d` starts the accounts database (PostgreSQL, port 5433,
-only reachable from this computer). The defaults work as they are; copy
-`.env.example` to `.env` to change them.
+- `docker compose up -d` starts the database (PostgreSQL on port 5433, only
+  reachable from this computer). The defaults work as they are; copy
+  `.env.example` to `.env` to change them.
+- `setup.py` installs the Python packages. `main.py` starts LangVis and opens
+  http://localhost:8765 (`python main.py --no-open` starts only the server).
+- The page is built with Next.js into `frontend/out`, and the Python server
+  serves it. After changing the page, build it again:
 
-`setup.py` installs the dependencies. `main.py` starts LangVis and opens
-http://localhost:8765 on the **Home** page (`python main.py --no-open`
-starts only the server).
+```bash
+cd frontend && npm install && npm run build
+```
 
-1. **Sign up** (top right) with your name, email and a password, and choose
-   the language to learn. Every account has its own level, course, words,
-   history, memory and settings; the tutor calls you by your name.
+Then:
+
+1. **Sign up** with your name, email and a password. Every account keeps its own
+   level, courses, words, history and settings.
 2. Paste a free [Gemini API key](https://aistudio.google.com/apikey) when the
    page asks for it.
-3. Open **Settings** from your name at the top right: your own language, the pace and how strictly to correct.
-4. On **Home**, press **Start learning a new language** and choose English or
-   Slovak - its courses open. Continue your course, or open the **Tutor**, pick
-   a topic and press **Start**. Allow the microphone, and talk.
+3. In **Settings** (click your name at the top right) choose your own language
+   (for translations), the speaking pace and how strictly to correct.
+4. Open **Courses** and press **Start the lesson** - or open the **Tutor** and
+   press **Start**. Allow the microphone and talk. You can also type.
 
 ---
 
-## Courses and Tutor
+## A short tour
 
-The header holds everything: the logo, the **language** you learn (🌐) and your
-level, and the pages - **Home**, **Courses**, **Tutor** and **Account**. The
-**topic** and the **grammar syllabus** appear only on the Tutor page.
+The home page explains LangVis and shows the courses. The mascot walks beside
+the text as you scroll.
 
-**Home** is the start page: what LangVis is, the two ways to learn, every
-course as tabs (Slovak | English) with its weeks and lessons, and **Start
-learning a new language** - it asks which language, then opens its courses.
+![Home](docs/screenshots/01-home.png)
 
-![The Home page](docs/screenshots/15-home.png)
+![The courses on the home page](docs/screenshots/02-home-courses.png)
 
-![The courses on the Home page](docs/screenshots/16-home-courses.png)
+Signing up and logging in are friendly: the mascot says hello to your name,
+watches your email being typed, and closes its eyes while you type your
+password (it peeks now and then). When login works it is glad; when the
+password is wrong it is sad.
 
-
-![The header and the language pick](docs/screenshots/01-language.png)
-
-| | **Courses** | **Tutor** |
+| Sign up | Log in | Signed in |
 |---|---|---|
-| For | learning step by step, from zero | practising freely |
-| What leads | the course material, lesson by lesson | you - any topic, any question |
-| Rules | strict: every step is taught and repeated | none: gentle guidance, no forced repeats |
-| Left of the board | the course syllabus, always open | - |
-| Right of the board | this lesson's words and words to review | the topic's words |
+| ![Sign up](docs/screenshots/03-sign-up.png) | ![Log in](docs/screenshots/04-log-in.png) | ![Signed in](docs/screenshots/05-signed-in.png) |
 
-**Nothing starts by itself.** The board waits with a **Start** button and the
-teacher begins only when you press it. **Continue the lesson** on the Courses
-page is a Start too. Leaving the page, choosing another topic, language or
-course lesson, or losing the connection stops the lesson until you press
-**Start** again.
+After signing in, the home page greets you and takes you back to your course
+or to the Tutor.
 
-![The board before Start](docs/screenshots/00-start.png)
-
-The **language select** in the header (🌐 `English`, `Slovak`)
-switches the language you are learning. The page reloads and everything - the
-level, the courses, the words, the history - is that language's.
+![Home, signed in](docs/screenshots/06-home-signed-in.png)
 
 ---
 
-## Tutor - free conversation
+## Courses
 
-The Tutor is a friendly conversation partner, not a drill. Talk about anything,
-pick a topic in the header (Daily life, Work, Home, Food, Shopping and money,
-Travel, Health, Free time, Family and friends, Technology, City and transport,
-Education, Opinions and society, or **your own** - a coffee shop, football,
-a job interview...), or stay in free talk. Ask for a grammar rule, a word, a
-role play or a quick exercise at any moment.
+A course is a fixed path of lessons for one language and level. The teacher
+follows it step by step, never skips anything, and remembers exactly where you
+stopped. A language can have more than one course; they show as tabs.
 
-The Tutor helps with **guidance, not rules**:
+![The Courses page](docs/screenshots/07-courses.png)
 
-- A mistake is corrected **once**, kindly ("We'd say: ..."), and the talk goes
-  on - you do not have to repeat it. The board shows the mistakes in red, the
-  corrected sentence and why.
-- Now and then it offers **one more natural way** to say it ("You could also
-  say: ..."), shown on the board with each new word explained and translated.
-- It keeps you speaking: an answer, then a follow-up question about what you said.
+The syllabus shows every week and lesson: its words, its grammar point, its
+parts and its speaking task.
 
-![A correction in the Tutor](docs/screenshots/07-topic-correction.png)
+![The syllabus](docs/screenshots/08-syllabus.png)
 
-![A better way to say it](docs/screenshots/08-topic-better.png)
-
-### Grammar on the board
-
-Ask "explain the present perfect", or click a mistake, and the rule is drawn
-on the board: the rule in one sentence, the form, a picture (a timeline, two
-columns, blocks), your own mistake and examples. Then three practice questions.
-
-![Grammar on the board](docs/screenshots/09-grammar-board.png)
-
-### A topic taught step by step - when you ask
-
-Say "teach me this topic" and the Tutor gives the topic's material step by
-step: its words and word partners, linking words, a grammar point, how to make
-a sentence longer, a model dialogue and sentence frames.
-
-![Making a sentence longer](docs/screenshots/10-topic-lesson.png)
-
-### The English grammar ladder behind the Tutor
-
-| Stage | Title | Units |
+| Course | Levels | Size |
 |---|---|---|
-| **A2.1** | Everyday forms | Present simple & questions · Present continuous · Past simple · Articles, prepositions & word order |
-| **A2.2** | Talking beyond now | Future: going to & will · Comparatives & quantity · Modals · Linking a story |
-| **B1.1** | Perfect and past | Present perfect · Past continuous & used to · Perfect vs past simple · First conditional |
-| **B1.2** | Longer sentences | Second conditional · -ing or to · Relative clauses & word forms · Passive voice |
-| **B2.1** | Precision in the past | Past perfect · Third conditional & wishes · Reported speech · Modals of deduction |
-| **B2.2** | Range and control | Advanced passive · Future continuous & perfect · Discourse markers · Collocations |
+| **English · Small talk** - how are you, work, the weekend, plans, and chats in a café, a shop, at university, at work, at a party, on a train | A2 → B1 | 20 lessons, 5 weeks |
+| **English · Phrasal verbs for daily speaking** - the phrasal verbs people really use, in longer and longer sentences | A2 → B1+ | 20 lessons, 5 weeks |
+| **Slovak · Small talk** - the small talk method from the first words: greetings, weather, work, and then real places | A1 → A2 | 28 lessons, 7 weeks |
+| **Slovak · From zero** - from "Ahoj!" to talking about your life, work, plans and opinions | A1 → B1 | 30 lessons, 6 weeks |
 
-Your level and grammar are measured from everything you say, and the Tutor
-speaks at your level with words one step above it.
+### One lesson
 
----
+Every lesson has the same parts, each shown on the board: **words**, ready
+**phrases**, one **grammar** point, **longer sentences**, a **dialogue**,
+**translation** or **sentence building**, **questions about your own life**, and
+at the end a **speaking task** where you just talk. The outline on the left
+shows where you are.
 
-## Courses - learning from zero
+The teacher asks you to say each item. It checks what you said: every word
+must be there (small slips and accents are forgiven, names may be your own).
+If it is not right, you hear it again once - then the lesson goes on, so you
+never get stuck.
 
-A course is fixed, hand-written material. The teacher follows it exactly,
-never skips and never jumps ahead, and remembers the exact step where you
-stopped. The Courses page shows only the courses of the language chosen in the
-header: Slovak shows the Slovak course, English the English one.
+![A wrong repeat: "Again"](docs/screenshots/10-lesson-again.png)
 
-![The Courses page](docs/screenshots/02-courses.png)
+![A grammar point](docs/screenshots/11-lesson-grammar.png)
 
-The page shows the course, the lesson to do now with its words and progress,
-and the whole course by week. Lessons you have finished can be opened again.
+The **small talk method** is practised in every small talk lesson: never give
+a one-word answer. React, answer, add one small detail, and ask back. The
+"Longer sentences" part shows one answer growing step by step.
 
-### One course lesson
+![A sentence growing longer](docs/screenshots/12-lesson-longer.png)
 
-Every lesson has about 30 steps. The syllabus on the left shows where you are;
-the right side lists the lesson's words with their meaning and Azerbaijani
-translation, and the word being taught right now is framed.
-
-| Part | What happens |
-|---|---|
-| **Review** | the teacher says a word from an earlier lesson in English, you say it in Slovak |
-| **Words** | 8 new words, each said, explained and repeated |
-| **Phrases** | 5 ready phrases to say |
-| **Grammar** | one rule in simple words, a table on the board, 3 examples to repeat |
-| **Dialogue** | the teacher plays a role, you say your own lines |
-| **Translate** / **Build sentences** | Slovak: say an English sentence in Slovak · English: join or upgrade sentences yourself |
-| **Questions for you** | questions about your own life, with a model answer |
-| **Speaking task** | free conversation on the lesson; say "next lesson" to go on |
-
-Grammar in a course lesson:
-
-![Grammar in a course lesson](docs/screenshots/04-course-grammar.png)
-
-The dialogue, line by line:
-
-![The dialogue](docs/screenshots/06-course-dialogue.png)
-
-Translation practice:
-
-![Translation practice](docs/screenshots/05-course-translate.png)
-
-### The Slovak course: A1 → B1 in 6 weeks
-
-| Week | Level | Lessons |
-|---|---|---|
-| **1** · Me and my world | A1 | Hello and my name · Where are you from (byť) · Numbers and age (mať) · My family (môj, moja) · Job and languages |
-| **2** · Every day | A1 | My day and the time · In the café · Shopping and prices · In the city · Free time and likes |
-| **3** · Past and future | A2 | Yesterday (past tense) · My weekend story · Plans (future) · My flat · At the doctor |
-| **4** · Out in the world | A2 | Travel and transport · My opinion · Comparing · Phone calls and requests · A2 checkpoint |
-| **5** · Experiences, wishes, people | B1 | Experiences (aspect) · Wishes with keby · Giving advice · Describing people (ktorý) · Job interview |
-| **6** · Real life in Slovakia | B1 | A complaint · News and events · At the office (residence permit) · Holidays and traditions · Final B1 test |
-
-In weeks 1-2 everything is explained in simple English; from week 3 in simple
-Slovak. The board always shows the Azerbaijani translation too.
-
-### The English course: phrasal verbs for daily speaking, A2 → B1+ in 5 weeks
-
-For a learner who already speaks basic English and wants to talk about daily
-life. Every lesson teaches six everyday **phrasal verbs** and shows how to make
-a sentence **grow**: "I wake up." → "I wake up at seven." → "I usually wake up
-at seven on weekdays, but I get up at nine on Sundays." The learner first sees
-one sentence grow part by part (when, where, who with, why, a contrast, a
-result), then **builds** sentences themselves.
-
-| Week | Level | Lessons |
-|---|---|---|
-| **1** · My day with phrasal verbs | A2 | Morning (wake up, get up) · Going out (set off, get on) · Evening (come back, tidy up) · Free time (hang out, eat out, stay in) |
-| **2** · People, messages and plans | A2 | Phone (call back, pick up) · Friends (meet up, catch up) · Shopping (look for, try on) · Plans (look forward to, put off) |
-| **3** · Problems, work and stories | B1 | Problems (break down, run out of) · Work (take on, deal with) · Stories (end up, turn out) · Plans change (work out, back out) |
-| **4** · Feelings, habits and advice | B1 | Feelings (cheer up, calm down) · People (fall out, make up) · Habits (give up, cut down on) · Advice (think over, go for) |
-| **5** · Fluent daily speaking | B1+ | Travel (check in, get around) · Discussion (come up with, bring up) · Changes (move on, carry on) · B1+ final story |
-
-Everything is explained in simple English, with the Azerbaijani translation of
-every word and phrase on the board.
+**Every word is taught before it is asked for.** Each lesson's word list holds
+every word the learner has to say in it; in the free speaking part the teacher
+may only use what the course has taught so far - a new word is taught first.
 
 ---
 
-## How one sentence is checked
+## Tutor
 
-LangVis **thinks before it answers**. A live voice model normally replies the
-instant you stop talking. Here the server decides when your turn ends, holds
-the tutor's reply, transcribes your own voice (mistakes kept) and checks it.
-Only then does the tutor speak, told exactly what to say.
+The Tutor is free conversation - your own teacher, ready for whatever you
+need: talk about anything, ask about a word or a rule, get ready for a trip or
+an interview.
 
-```
-you speak ──▶ thinking ──▶ a mistake?  "Did you mean: …? Say it."     ──▶ you repeat ✓
-                                                                             │
-                           correct?    "Better: … Now you say it."  ◀────────┘
-                                                                     ──▶ you repeat ✓
-                           "Good." + an answer + the next question
-```
+![The Tutor before Start](docs/screenshots/13-tutor.png)
 
-- In a **course** a mistake and a better version are repeated; in the **Tutor**
-  they are only said once and the talk goes on.
-- A repeat is checked by the system, not by the model: it must match the
-  sentence and contain the part that matters.
-- A repeat is asked for at most twice, then the lesson moves on. **Skip**
-  moves on at once.
-- **I didn't say that** takes back a sentence that was misheard.
-- **Fluency · 2 min** lets you talk without being stopped; the feedback comes
-  at the end.
-- Typed sentences go through exactly the same steps.
+Choose a **topic** at the top of the side panel - or write **your own
+scenario** ("be a barista, I am the customer") and the tutor builds the
+conversation around it. The topic's words fill the side panel once you start.
 
----
+![Topics](docs/screenshots/14-tutor-topics.png)
 
-## Hearing a beginner
+A sentence with mistakes is corrected once, kindly: the board underlines the
+mistakes, shows the corrected sentence and why, and offers a better way to say
+it one level up. "You can say" gives ideas for your next answer. Under the
+microphone you always see **exactly what the system heard**.
 
-Beginner speech is slow and has an accent, so LangVis helps the listening side:
+![A correction](docs/screenshots/15-tutor-correction.png)
 
-- **It lets you talk at length.** The pause that ends a sentence follows your
-  level: 2.4 s at A1, 2.1 s at A2, 1.8 s at B1, 1.6 s above - and the longer
-  you have been talking, the longer a pause to think may be (up to 0.8 s more).
-  If you go on talking while your sentence is being checked, the check is
-  dropped and the whole, longer sentence is heard together. One turn may last a
-  minute.
-- **Only what you really said.** The transcriber knows nothing of the lesson,
-  so it cannot "hear" a fitting answer in noise; noise and typing give nothing.
-  The tutor gets your sentence as text - exactly what you see under the
-  microphone - never the audio.
-- **Repeating is not an echo.** The tutor's own voice coming back through the
-  speakers is dropped only when it starts during its speech or right after it.
-  You repeating "Say it: prosím" a moment later is you.
-- A sentence that takes too long to check changes nothing in the lesson; the
-  lesson never moves on without the tutor knowing.
-- **Checking is fast.** The check starts already during your pause (after
-  about half of the end silence); if you go on talking it is thrown away. The
-  checker hears the sentence without its long end silence, is asked not to
-  think at length, and when a model is slow a second one starts beside it.
-  The log shows each turn's timing as `[Speed] ...`.
+Ask about any grammar ("Can you explain the past simple?") and the rule is
+drawn on the board, with a picture, the forms and your own mistakes - then you
+practise it.
+
+![Grammar on the board](docs/screenshots/16-tutor-grammar.png)
 
 ---
 
 ## Account, Dictionary and Grammar
 
-**Account** shows your level over time, dictionary growth, mistakes per day,
-where the mistakes are and every correction ever made. Two buttons at the top
-right open its other pages: **Dictionary** and **Grammar**.
+**Account** - your level over time, how your dictionary grows, your mistakes
+per day, where they are, and every correction ever made.
 
-### Dictionary
+![Account](docs/screenshots/17-account.png)
 
-Every item you meet - the topic lists and every upgrade the board showed you -
-is kept for good, with how often and on how many **different days** you used it.
+**Dictionary** - every word and phrase you met: how often and on how many
+different days you used it. A word comes back in your lessons until it is yours.
 
-![The Dictionary](docs/screenshots/11-dictionary.png)
+![Dictionary](docs/screenshots/18-dictionary.png)
 
-| Status | Means | Comes back |
-|---|---|---|
-| new | not used yet | in its topic, until you use it |
-| learning | used on 1-2 different days | after 1, then 3 days |
-| learned | used on 3+ different days | after 7 or 14 days |
-| strong | used on 5+ different days | every 30 days, forever |
+**Grammar** - every rule from A1 to B2 and how well you know it, measured from
+what you actually say. Click a rule to see your own mistakes and the rule.
 
-### Grammar
-
-Every grammar rule from A1 to B2 with how well you know it, measured from what
-you say. Click a rule to see its explanation and your own mistakes.
-
-![Grammar](docs/screenshots/14-grammar.png)
-
-### Account
-
-![Account](docs/screenshots/12-account.png)
+![Grammar](docs/screenshots/19-grammar.png)
 
 ---
 
-## Languages and explanations
+## How the system works
+
+LangVis **checks before it answers**. A voice model on its own answers the
+moment you stop, before anything has looked at what you said. Here the server
+decides when your sentence ends, writes it down, checks it, decides the reply -
+and only then lets the teacher speak.
+
+```
+you speak
+   │
+   ├─ the server hears where your sentence ends (a pause of 1.6 - 2.4 s, longer for beginners)
+   │     the check already starts during the pause, to save time
+   │
+   ├─ 1. WRITE IT DOWN  - exactly your words, mistakes kept; no guessing
+   │                      (noise, typing or silence give nothing at all)
+   ├─ 2. CHECK IT       - mistakes, the grammar behind them, a better version
+   ├─ 3. DECIDE         - "Good." / "Again: …" / a correction / the next step
+   │
+   └─ the teacher gets your sentence AS TEXT (what you see under the microphone)
+      and the decided reply, and says it; its words appear with its voice
+```
+
+### Hearing you correctly
+
+- **Only what you really said.** The transcriber knows nothing about the lesson,
+  so it cannot "hear" a fitting answer in noise. Too many words for too little
+  speech are thrown away. The teacher never gets the raw audio - only the text
+  you see - so it cannot make its own guess.
+- **Talk as long as you like.** The pause that ends a sentence is long for
+  beginners (2.4 s at A1, 2.1 s at A2, 1.8 s at B1, 1.6 s above) and grows
+  after a long stretch of talking. If you go on talking while your sentence is
+  being checked, the check is dropped and the whole sentence is heard together.
+  One turn may last a minute.
+- **Repeating is not an echo.** The teacher's own voice coming back through
+  the speakers is dropped, but you repeating the phrase you were asked to say -
+  even quickly - counts.
+- **Your facts stay yours.** If you say "I live in Prešov", a correction or a
+  better version never turns it into the course's example city; the teacher
+  remembers your fact for the rest of the lesson.
+
+### Speed
+
+- The checking calls ask the model not to think at length, have a short
+  timeout, and when a model is slow a second one starts beside it - the first
+  good answer wins.
+- The check starts already during the pause that may end your sentence.
+- The log shows each turn's timing: `[Speed] silence->checked … · checked->voice …`.
+
+### The board and the teacher's voice
+
+The teacher's words are sent to the page in step with its voice and typed out
+as it speaks; its mouth takes the shape of the letter being said. When it
+explains something on the board, it walks to it.
+
+---
+
+## The mascot
+
+The LangVis face is also a small mascot that guides you through the pages:
+
+- **Home, Courses, Account, Dictionary, Grammar** - it says what the page is
+  about, then walks beside the headings as you scroll. It looks for the next
+  part while you scroll and says "wow" when it finds it. It never covers the
+  text and never blocks a click.
+- **Log in and Sign up** - it sits on the form and reacts to each field.
+- **Not in a lesson or the Tutor** - there the teacher itself is on the board.
+
+---
+
+## Languages and levels
 
 | Language | Starts at | Explained in |
 |---|---|---|
 | English | A2 | simple English |
 | Slovak | A1 | simple English at A1, simple Slovak from A2 |
 
-Your own language (Azerbaijani, Turkish or Russian) is used for translations
-on the board and in the dictionary. Progress is kept separately per language.
+Your own language (Azerbaijani, Turkish or Russian) is used for translations on
+the board and in the dictionary. Each language keeps its own level, courses,
+words and history. The level is measured from what you say and shown in the
+header.
 
 ---
 
 ## What is saved
 
 Everything is kept in the PostgreSQL database of `docker-compose.yml` - there
-are no data files. The accounts (name, email, a scrypt hash of the password,
-sessions) and everything an account learns are rows of their own:
+are no data files.
 
 | Table | What it holds |
 |---|---|
-| `users` · `sessions` | the accounts and their signed-in browsers |
+| `users` · `sessions` | the accounts (a scrypt hash of the password) and their signed-in browsers |
 | `app_settings` | the Gemini keys, shared by all accounts on this computer |
 | `user_settings` | the account's name, voice and tutor settings |
-| `user_memory` | what LangVis remembers about the learner |
+| `user_memory` | what LangVis remembers about the learner, and short lesson summaries |
 | `learner_progress` | per language: level, skills, mistakes, dictionary - the source of truth |
-| `learner_reports` | per language: a readable summary, regenerated from the progress |
-| `course_progress` | per language: current lesson, current step, finished lessons |
-| `topic_materials` | each topic's fixed word list and its first lesson |
-| `conversation_lines` | every line of every topic's conversation, and of the course |
+| `learner_reports` | per language: a readable summary, made from the progress |
+| `course_progress` | per course: the current lesson and step, and the finished lessons |
+| `topic_materials` | each topic's word list and its first lesson |
+| `conversation_lines` | every line of every conversation |
 
 There is one microphone and one voice lesson, so one account uses LangVis at a
-time: when another account signs in, the first one's lesson stops (its
-progress is kept) and its tabs say so.
-
-Earlier versions kept JSON files (`users/u<id>/`, `english/`, `slovak/`,
-`memory/long_term.json`, `config/api_keys.json`). On start they are moved into
-the database once and deleted; the very first account takes over the progress
-made before accounts existed.
-
----|---|
-| `level.json` | level, skills, mistakes, course position, dictionary - the source of truth |
-| `progress.md` | a readable summary, regenerated from `level.json` |
-| `intensive.json` | the course: current lesson, current step, finished lessons |
-| `topics/*.json` | each topic's fixed word list and its first lesson |
-| `history/*.jsonl` | the conversation of every topic, and of the course |
+time: when another account signs in, the first one's lesson stops (its progress
+is kept).
 
 ---
 
 ## Project structure
 
 ```
-main.py                     starts the server and opens the browser
-setup.py                    installs dependencies
+main.py                        starts the server and opens the browser
+setup.py                       installs the Python packages
+docker-compose.yml             the PostgreSQL database
 
 web/
-  server.py                 aiohttp server: page, WebSocket, JSON for the pages
-  bridge.py                 the session's messages to every open tab
-  static/                   the page (no build step)
-    index.html · app.css
-    app.js                  socket, header, pages, the language choice, settings
-    img/                    the logo and the pictures on the Home page
-    board.js                the board and the tutor's walk across it
-    pages.js                Home, Courses, Account, Dictionary and Grammar pages, the course syllabus
-    tutor.js · diagrams.js  the LangVis face and the grammar pictures
-    audio.js · mic-worklet.js
+  server.py                    aiohttp server: the page, the WebSocket, JSON for the pages
+  auth.py                      accounts: sign up, log in, sessions
+  bridge.py                    the lesson's messages to every open tab
 
 core/
-  live.py                   the Gemini Live session: turns, thinking, voice, echo
-  prompt.txt                the teacher's core instructions
-  store.py                  every piece of data, in PostgreSQL
-  plugin_loader.py · selflog.py
+  live.py                      the Gemini Live session: when a sentence ends, the check
+                               before the reply, the voice, echo, speed
+  prompt.txt                   the teacher's core instructions
+  store.py                     every piece of data, in PostgreSQL
+  plugin_loader.py · profile.py · selflog.py
 
 tutor/
-  curriculum.py             English skills, rules, stages; the languages
-  slovak.py                 Slovak skills, rules and stages
-  intensive_slovak.py       the Slovak course: 30 lessons, A1 → B1
-  intensive_english.py      the English course: phrasal verbs for daily speaking, 20 lessons, A2 → B1+
-  topics.py                 topics, their dictionaries and first lessons
-  progress.py               learner state: level, skills, course, dictionary
-  analysis.py               transcription and per-sentence analysis
+  analysis.py                  writing down and checking a sentence (Gemini, with fallbacks)
+  curriculum.py · slovak.py    skills, rules and stages; the languages
+  english_small_talk.py        English · Small talk (20 lessons)
+  intensive_english.py         English · Phrasal verbs (20 lessons)
+  slovak_small_talk.py         Slovak · Small talk (28 lessons)
+  intensive_slovak.py          Slovak · From zero (30 lessons)
+  topics.py                    the Tutor's topics and their word lists
+  progress.py                  the learner's level, skills and dictionary
 
 plugins/
-  language_tutor.py         the teacher: taught steps, courses, correct → enrich → record
+  language_tutor.py            the teacher: taught steps, courses, the check,
+                               corrections, the board, the pages' data
 
-docs/                       logo.png and screenshots/ - the pictures in this file
-memory/                     settings and memory (stored through core/store.py)
+memory/                        settings and memory (stored through core/store.py)
+
+frontend/                      the page (Next.js, built into frontend/out)
+  src/app/                     Home, Courses, lesson, Tutor, Account, Dictionary, Grammar, Log in, Sign up
+  src/components/              the header, the classroom, the mascot, dialogs, shadcn/ui
+  src/legacy/                  the board, the teacher's face (tutor.js), diagrams, audio
+  public/                      the logo, the pictures on the home page, the microphone worklet
+
+docs/                          the logo and screenshots/ - the pictures in this file
 ```
 
 ---
@@ -421,35 +353,46 @@ memory/                     settings and memory (stored through core/store.py)
 
 ### A new course
 
-Write a file like `tutor/intensive_slovak.py`: a list of lessons, each with
-words, phrases, one grammar point, a dialogue, translations, questions and a
-speaking task. Register it in `INTENSIVE_COURSES` in
-`plugins/language_tutor.py` and it appears on the Courses page.
+1. Write a file like `tutor/english_small_talk.py`: a list of lessons, each with
+   words, phrases, one grammar point, a dialogue, longer sentences, translation
+   or building tasks, questions and a speaking task.
+2. Make sure every word the learner has to say is taught in the lesson (or an
+   earlier one) - add missing ones to its word list (`MORE_WORDS` in the
+   Slovak courses shows how).
+3. Register it in `INTENSIVE_COURSES` and `COURSE_CATALOG` in
+   `plugins/language_tutor.py`. It appears on the Courses page, as a tab next
+   to the other courses of its language.
 
 ### Plugins
 
 Any file in `plugins/` with a `PLUGIN` dict and a `run()` function becomes a
-tool the tutor can call. Start from `plugins/_template.py`.
+tool the teacher can call. Start from `plugins/_template.py`.
 
 | Hook | Use |
 |---|---|
 | `observe(text, player)` | see every sentence |
 | `format_for_prompt()` | standing instructions for every session |
-| `opening_note()` | the first thing the tutor says in a lesson |
-| `gate_audio()` / `gate_text()` | decide the tutor's reply before it speaks |
+| `opening_note()` | the first thing the teacher says in a lesson |
+| `gate_audio()` / `gate_text()` | hear and check a sentence, and decide the reply before the teacher speaks |
 | `status_for_ui()` / `coaching_for_ui()` | what the page shows |
-| `PLUGIN_SETTINGS` | fields in the ⚙ settings form |
+| `PLUGIN_SETTINGS` | fields in the settings form |
+
+### Screenshots
+
+The pictures in this file were taken with a demo account on this computer
+(its test email and password are in `.env.example`) in a headless browser at
+1440 × 900.
 
 ---
 
 ## Limits and privacy
 
 - A **free Gemini key** has daily limits. When a model is busy or its limit is
-  used up, the next model takes over; when all are spent, the board says why
-  the tutor is quiet.
-- The server listens on `127.0.0.1` only, and only its own page may connect.
-- Your API key, settings, memory and all progress stay on your computer, in
-  the local database. Audio is sent only to the Gemini API during a lesson.
+  used up, the next model takes over; when all are spent, the page says why the
+  teacher is quiet. More keys can be added in Settings.
+- The server listens on this computer only, and only its own page may connect.
+- Your API key, settings, memory and all progress stay on your computer, in the
+  local database. Your voice is sent only to the Gemini API during a lesson.
 
 ---
 

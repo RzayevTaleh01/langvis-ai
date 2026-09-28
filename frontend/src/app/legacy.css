@@ -169,7 +169,7 @@ a { color: var(--pri); }
 }
 body[data-state="SPEAKING"] .speech-who::before { opacity: 1; animation: pulse 1s ease-in-out infinite; }
 .speech-text {
-  margin: 0; min-width: 0; max-height: 5.4em; overflow-y: auto;
+  margin: 0; min-width: 0; max-height: 5.8em; overflow-y: auto;   /* exactly 4 lines: none cut in half */
   font: 15px/1.45 var(--ui); color: var(--ink-strong); scroll-behavior: smooth;
 }
 .speech.empty .speech-text { color: var(--ink-dim); font-style: italic; }

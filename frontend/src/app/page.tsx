@@ -182,7 +182,7 @@ function HowChecked() {
       </ol>
       <div className="home-two">
         <img src="/img/09-grammar-board.png" alt="Grammar on the board" loading="lazy" />
-        <img src="/img/08-topic-better.png" alt="A better way to say it" loading="lazy" />
+        <img src="/img/08-topic-better.png" alt="A sentence growing longer, step by step" loading="lazy" />
       </div>
     </section>
   );

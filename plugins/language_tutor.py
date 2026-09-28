@@ -1161,6 +1161,7 @@ def _direct_turn(text: str, player=None) -> str:
     if the tutor's last correction or board was off, say so and fix it."""
     _turn.update(phase="free", expected="", better="", enrich=[], attempts=0, must=[])
     _turn["practice"] = None
+    _plain_card(text)
     if _RULE_RE.search(text) and "?" not in text:
         _turn["rules"] = (_turn.get("rules", []) + [text.strip()[:160]])[-MAX_RULES:]
     _mode(player, "talk")
@@ -1585,10 +1586,18 @@ def _decide(text: str, result: dict | None, player) -> dict:
     return {"text": text, "note": _free_turn(text, handled, player), "handled": True}
 
 
+def _plain_card(text: str) -> None:
+    """A sentence that is a request, not practice: the board shows it as it is -
+    and never the correction of the sentence before it."""
+    _set_coaching({"said": text, "clean": True, "fixes": []})
+
+
 def _explain_turn(text: str, handled: dict, about: str, player, sid: str | None = None) -> str:
     """The learner told the teacher what to do. Their sentence is fixed in one
     breath - no repeat, no better version - and the lesson goes on the board."""
     _turn.update(phase="free", expected="", better="", enrich=[], said=text, attempts=0, must=[])
+    if not (handled or {}).get("result"):
+        _plain_card(text)
     sid = sid or _find_skill(about or text, _lang())
     card = _skill_card(sid) if sid else {}
     if card:
