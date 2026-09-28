@@ -1967,14 +1967,51 @@ def _fold(text: str) -> str:
                    if unicodedata.category(c) != "Mn")
 
 
+WORD_CLOSE = 0.72     # a word said like this is the taught word (accents and small slips forgiven)
+SHORT_CLOSE = 0.8     # a short word (up to 4 letters) must be closer: "good" is not "food"
+_SHORT_FORMS = ((r"n't\b", " not"), (r"'m\b", " am"), (r"'re\b", " are"), (r"'s\b", " is"),
+                (r"'ll\b", " will"), (r"'ve\b", " have"), (r"'d\b", " would"))
+
+
+def _long_forms(text: str) -> str:
+    """English short forms written out: "How's" is "How is", "don't" is "do not"."""
+    text = (text or "").replace("’", "'")
+    for short, full in _SHORT_FORMS:
+        text = re.sub(short, full, text, flags=re.IGNORECASE)
+    return text
+
+
 def _teach_close(said: str, expected: str) -> bool:
-    """Close enough to what was taught - accents forgiven: the transcript of a
-    beginner's "práca" is often "praca"."""
+    """They said what was taught: EVERY word of it is there - each one
+    close enough, with accents and small slips forgiven (a beginner's "práca"
+    is often transcribed "praca", "dobrý" may come out "dobré"). In a long line
+    (five words or more) one word may be missing. Names may differ: "Volám
+    sa Farid" for "Volám sa Taleh" is their own name. One right word out of
+    two is NOT enough: "not passing" is not "not bad"."""
     import difflib
-    a, b = " ".join(an.words(_fold(said))), " ".join(an.words(_fold(expected)))
-    letters = difflib.SequenceMatcher(a=a, b=b).ratio() if a and b else 0.0
-    return max(_similar(said, expected), _similar(_fold(said), _fold(expected))) >= REPEAT_TEACH \
-        or letters >= 0.7
+    # English short forms count both ways: "How is" and "Hows" are "How's".
+    if "'" in expected or "’" in expected:
+        plain = expected.replace("’", "'").replace("'", "")
+        if plain != expected and _teach_close(said, plain):
+            return True
+    said, expected = _long_forms(said), _long_forms(expected)
+    heard = an.words(_fold(said))
+    if not heard:
+        return False
+    # Two heard words may be one taught word ("do videnia" for "dovidenia").
+    candidates = heard + [a + b for a, b in zip(heard, heard[1:])]
+    names = {an.words(_fold(n))[0] for n in an.names(expected) if an.words(_fold(n))}
+    wanted = [w for w in an.words(_fold(expected)) if w not in names]
+    if not wanted:
+        return True
+
+    def found(word: str) -> bool:
+        need = SHORT_CLOSE if len(word) <= 4 else WORD_CLOSE
+        return any(c == word or difflib.SequenceMatcher(a=c, b=word).ratio() >= need
+                   for c in candidates)
+
+    missing = sum(1 for w in wanted if not found(w))
+    return missing == 0 or (len(wanted) >= 5 and missing <= 1)
 
 
 def _teach_turn(text: str, player=None) -> str:

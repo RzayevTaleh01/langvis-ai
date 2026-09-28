@@ -67,19 +67,47 @@
   .cp-now-row [data-slot="button"] { width: 100%; }
 }
 
-/* The mascot on the home page (components/home-guide.tsx): a picture beside
-   the sections, on the left and on the right in turn, never over the text.
-   Between 900 and 1320 px the page keeps a margin on both sides for it; on a
-   phone it floats small at the top. */
+/* The mascot beside a page (components/home-guide.tsx): Home, Courses and the
+   Account pages. A picture beside the content, on the left and on the right in
+   turn, never over the text: where the screen is too narrow for it beside the
+   content, the page keeps a margin on both sides. On a phone only the home
+   page shows it, small, at the top. */
 .home-guide { position: fixed; top: 0; left: 0; width: 112px; height: 112px; z-index: 5;
   pointer-events: none; will-change: transform; transform-origin: 50% 90%; }
-.home-guide .face { width: 100%; height: 100%; overflow: visible; }
+.home-guide-face { width: 100%; height: 100%; }
+.home-guide-face .face { width: 100%; height: 100%; overflow: visible; }
+/* Its word about the page, above it for a few seconds. */
+.home-guide-bubble {
+  position: absolute; bottom: calc(100% + 10px); left: 0;
+  width: max-content; max-width: 210px; text-align: left;
+  padding: 8px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 22px rgba(35, 32, 26, .12); font-size: 13px; line-height: 1.4; font-weight: 600;
+  color: var(--ink-strong); animation: guide-bubble-pop .22s ease-out;
+}
+/* It starts at the mascot's outer edge and reaches towards the page (never off
+   the screen); the tail points down at the mascot's middle. */
+.home-guide.on-right .home-guide-bubble { left: auto; right: 0; }
+.home-guide-bubble::before, .home-guide-bubble::after {
+  content: ""; position: absolute; left: 48px; width: 0; height: 0; border-style: solid;
+}
+.home-guide.on-right .home-guide-bubble::before, .home-guide.on-right .home-guide-bubble::after { left: auto; right: 48px; }
+.home-guide-bubble::before { bottom: -9px; border-width: 9px 8px 0 8px; border-color: var(--border-strong) transparent transparent transparent; }
+.home-guide-bubble::after { bottom: -7px; border-width: 8px 7px 0 7px; border-color: var(--panel) transparent transparent transparent; }
+.home-guide.on-right .home-guide-bubble::before { border-width: 9px 8px 0 8px; }
+@keyframes guide-bubble-pop { from { opacity: 0; transform: translateY(6px) scale(.94); } to { opacity: 1; transform: none; } }
 @media (min-width: 900px) and (max-width: 1319px) {
   .page.home.has-guide { padding-left: 156px; padding-right: 156px; }
 }
+@media (min-width: 900px) and (max-width: 1399px) {
+  .page.doc.has-guide { padding-left: 156px; padding-right: 156px; }
+}
+@media (min-width: 900px) and (max-width: 1199px) {
+  .page.course-page.has-guide { padding-left: 156px; padding-right: 156px; }
+}
 @media (max-width: 899px) {
+  .home-guide { display: none; }
   .page.home { position: relative; }
-  .home-guide { position: absolute; top: 12px; right: 8px; left: auto; width: 64px; height: 64px; }
+  .page.home .home-guide { display: block; position: absolute; top: 12px; right: 8px; left: auto; width: 64px; height: 64px; }
 }
 
 /* Everything that can be clicked shows the hand. */
@@ -109,3 +137,27 @@ button:disabled, [aria-disabled="true"] { cursor: not-allowed; }
 .heard-line .heard-none { color: var(--bad); }
 .heard-line .heard-live::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 6px;
   border-radius: 50%; background: var(--pri); animation: pulse 1s ease-in-out infinite; vertical-align: middle; }
+
+/* The mascot on top of the Log in / Sign up card (components/auth-mascot.tsx):
+   it peeks over the card's top edge, its speech bubble beside it. */
+.auth-card { position: relative; margin-top: 56px; padding-top: 58px; }
+.auth-mascot-slot { position: absolute; top: -62px; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; }
+.auth-mascot { position: relative; width: 112px; height: 112px; }
+.auth-mascot-face { width: 100%; height: 100%; }
+.auth-mascot-face .face { width: 100%; height: 100%; overflow: visible; }
+.auth-bubble {
+  position: absolute; left: calc(100% + 10px); top: 22px; width: max-content; max-width: 210px;
+  padding: 8px 13px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 22px rgba(35, 32, 26, .12); font-size: 14px; line-height: 1.4; font-weight: 600;
+  color: var(--ink-strong); animation: auth-bubble-pop .22s ease-out;
+}
+.auth-bubble::before, .auth-bubble::after { content: ""; position: absolute; top: 16px; width: 0; height: 0; border-style: solid; }
+.auth-bubble::before { left: -9px; border-width: 7px 9px 7px 0; border-color: transparent var(--border-strong) transparent transparent; }
+.auth-bubble::after { left: -7px; border-width: 6px 8px 6px 0; border-color: transparent var(--panel) transparent transparent; }
+@keyframes auth-bubble-pop { from { opacity: 0; transform: scale(.9); transform-origin: left center; } to { opacity: 1; transform: none; } }
+@media (max-width: 560px) {
+  .auth-bubble { left: auto; right: calc(100% + 8px); max-width: 150px; font-size: 13px; }
+  .auth-bubble::before { left: auto; right: -9px; border-width: 7px 0 7px 9px; border-color: transparent transparent transparent var(--border-strong); }
+  .auth-bubble::after { left: auto; right: -7px; border-width: 6px 0 6px 8px; border-color: transparent transparent transparent var(--panel); }
+}
+

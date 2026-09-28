@@ -18,8 +18,10 @@ const C = {
 };
 const BODY = "M250 110 C295 110 360 175 360 220 C360 265 295 330 250 330 " +
              "C205 330 140 265 140 220 C140 175 205 110 250 110 Z";
-const EYE_L = "M190 230 L190 195 C190 178 205 168 220 168 C235 168 242 178 242 195 L242 230 Z";
-const EYE_R = "M258 230 L258 195 C258 178 265 168 280 168 C295 168 310 178 310 195 L310 230 Z";
+// Small whites, big pupils: a friendly, lively look.
+const EYE_L = "M198 224 L198 196 C198 184 206 177 217 177 C228 177 236 184 236 196 L236 224 Z";
+const EYE_R = "M264 224 L264 196 C264 184 272 177 283 177 C294 177 302 184 302 196 L302 224 Z";
+const EYE_MID = 200;             // the eyes blink around this line
 const MOUTH_Y = 248;
 
 // The shape of the mouth for a letter: [width, how far it opens].
@@ -55,6 +57,13 @@ export class TutorFace {
     this.done = false;
     this.shape = [1, 1];
     this.grin = 0;             // a happy open smile, 0..1 (the home page)
+    this.excite = 0;           // 0..1: sparkles and popping eyes (the home page)
+    this.mood = "";            // the mascot's face for a moment: laugh, wink, wow, grin
+    this.moodLeft = 0;         // ticks the mood still lasts
+    this.brow = 0;             // how far the brows are raised (0..1)
+    this.shut = false;         // eyes closed on purpose (a password is being typed)
+    this.peek = 0;             // ticks left of a secret peek with one eye while shut
+    this.nextPeek = 60;        // ticks until the next peek
     this.state = "SLEEPING";
     this.muted = false;
     this.look = null;          // {x, y} unit vector towards what it points at
@@ -97,15 +106,31 @@ export class TutorFace {
     this.eyes = [true, false].map((left) => {
       const g = el("g", {}, this.root);
       el("path", { d: left ? EYE_L : EYE_R, fill: C.panel }, g);
-      const pupil = el("rect", { width: 20, height: 20, rx: 4, fill: C.ink }, g);
+      const pupil = el("rect", { width: 24, height: 24, rx: 7, fill: C.ink }, g);
       const glint = el("circle", { r: 2.5, fill: C.panel, "fill-opacity": 0.75 }, g);
-      return { g, pupil, glint, cx: left ? 216 : 284, px: left ? 204 : 272 };
+      return { g, pupil, glint, cx: left ? 217 : 283, px: left ? 205 : 271 };
     });
     this.dots = [0, 1, 2].map((i) => el("circle", { cx: 214 + i * 36, cy: 86, r: 7, fill: C.think }, this.root));
     if (this.mascot) {
-      this.happyEyes = ["M194 208 Q216 184 238 208", "M262 208 Q284 184 306 208"].map((d) =>
+      this.brows = ["M200 170 Q217 160 234 168", "M266 168 Q283 160 300 170"].map((d) =>
+        el("path", { d, fill: "none", stroke: C.ink, "stroke-width": 6, "stroke-linecap": "round",
+                     "stroke-opacity": 0.85 }, this.root));
+      // A tear, for a sad moment.
+      this.tear = el("path", { d: "M0 -9 Q7 2 0 8 Q-7 2 0 -9 Z", fill: "#6fb7e8", opacity: 0 }, this.root);
+      // Closed on purpose: curved lids, "I'm not looking".
+      this.closedEyes = ["M199 200 Q217 214 235 200", "M265 200 Q283 214 301 200"].map((d) =>
+        el("path", { d, fill: "none", stroke: C.ink, "stroke-width": 7, "stroke-linecap": "round",
+                     "stroke-opacity": 0 }, this.root));
+      this.happyEyes = ["M199 207 Q217 187 235 207", "M265 207 Q283 187 301 207"].map((d) =>
         el("path", { d, fill: "none", stroke: C.ink, "stroke-width": 8, "stroke-linecap": "round",
                      "stroke-opacity": 0 }, this.root));
+      // Sparkles that pop around its head when it is excited.
+      this.sparkles = [[128, 118, 1], [374, 132, 0.85], [330, 62, 0.75], [170, 60, 0.65]].map(([x, y, k], i) => {
+        const g = el("g", { opacity: 0 }, svg);
+        el("path", { d: "M0 -26 Q4 -4 26 0 Q4 4 0 26 Q-4 4 -26 0 Q-4 -4 0 -26 Z",
+                     fill: i % 2 ? "#f2b632" : "#1fa872" }, g);
+        return { g, x, y, k, phase: i * 0.9 };
+      });
     }
     // The mouth is one path: a smiling line when closed, a smiling open mouth
     // when it talks; the tongue is clipped to it.
@@ -121,6 +146,20 @@ export class TutorFace {
   set(state, muted) {
     this.state = state;
     this.muted = !!muted;
+  }
+
+  // The mascot shows a feeling for a moment (it never moves for it):
+  // "laugh" - "^ ^" eyes, raised brows, "ha-ha-ha"; "wink" - one eye shut
+  // into a smile; "wow" - big eyes, high brows, a round "o"; "grin" - a wide
+  // smile; "search" - thinking: eyes scanning, one brow up, "hmm", dots above;
+  // "focus" - attentive: brows up a little, eyes a little bigger; "sad" -
+  // sad brows, a frown, droopy eyes looking down and a tear.
+  emote(mood, seconds = 1.2) {
+    this.mood = mood;
+    this.moodLeft = Math.round(seconds * 30);
+    if (mood === "laugh") { this.excite = 1; this.grin = 1; }
+    if (mood === "wow") this.excite = Math.max(this.excite, 0.6);
+    if (mood === "grin") this.grin = 1;
   }
 
   // The tutor's words of this turn so far. They are typed out as the voice
@@ -186,17 +225,39 @@ export class TutorFace {
     } else if (this.done) this.reveal();
 
     // The letter being said gives the mouth its shape.
-    const shapeTo = speaking ? shapeOf(this.full[Math.floor(this.shownF)]) : [1, 1];
+    const mood = this.moodLeft > 0 ? this.mood : "";
+    if (this.moodLeft > 0) this.moodLeft -= 1;
+    const shapeTo = speaking ? shapeOf(this.full[Math.floor(this.shownF)]) : mood === "wow" ? [0.6, 1] : [1, 1];
     this.shape = this.shape.map((v, i) => v + (shapeTo[i] - v) * 0.45);
 
     let target;
     if (this.muted || this.state === "SLEEPING") target = 0;
     else if (speaking) target = (0.22 + amp * 1.5) * (0.35 + 0.65 * this.shape[1]) * (amp < 0.02 ? 0.3 : 1);
     else if (this.state === "THINKING") target = 0.03;
+    else if (mood === "laugh") target = 0.5 + 0.35 * Math.abs(Math.sin(this.tick * 0.55));   // ha-ha-ha
+    else if (mood === "wow") target = 0.5;
+    else if (mood === "wink") target = 0.22;
+    else if (mood === "search" || mood === "sad") target = 0;
     else target = amp * 0.5 + this.grin * (this.mascot ? 0.55 : 0.3);
+    const browTo = this.shut ? 0 : mood === "wow" ? 1 : mood === "laugh" ? 0.7 : mood === "wink" ? 0.35
+      : mood === "focus" ? 0.4 : mood === "sad" ? 0.15
+      : mood === "search" ? 0.45 : this.excite * 0.4;
+    this.brow += (browTo - this.brow) * 0.25;
     target = Math.max(0, Math.min(1, target));
     this.mouth += (target - this.mouth) * (speaking ? 0.5 : 0.25);
     this.grin *= 0.97;
+    this.excite *= 0.955;
+    // Eyes shut for a password - but now and then one eye secretly peeks.
+    if (this.shut) {
+      if (this.peek > 0) this.peek -= 1;
+      else if (--this.nextPeek <= 0) {
+        this.peek = 20;                                   // ~0.7 s open
+        this.nextPeek = 75 + Math.floor(Math.random() * 60);   // again in 2.5-4.5 s
+      }
+    } else {
+      this.peek = 0;
+      this.nextPeek = 45;                                 // the first peek comes soon
+    }
 
     if (this.state === "SLEEPING") this.blink += (1 - this.blink) * 0.15;
     else {
@@ -207,7 +268,15 @@ export class TutorFace {
       this.blink *= 0.72;
     }
 
-    if (this.look) {
+    if (this.shut && this.peek > 0) {
+      // A secret peek: the open eye glances down at the field.
+      this.gazeTo = [2.5, 3];
+    } else if (mood === "sad") {
+      this.gazeTo = [0, 3];                       // sad: looking down
+    } else if (mood === "search") {
+      // Searching: the eyes scan from side to side, a little upwards.
+      this.gazeTo = [Math.sin(this.tick * 0.16) * 4.5, -2];
+    } else if (this.look) {
       // Looking at the word it is explaining.
       this.gazeTo = [this.look.x * 4, this.look.y * 3];
     } else if (this.tick % 40 === 0) {
@@ -250,23 +319,61 @@ export class TutorFace {
     this.rim.setAttribute("stroke-opacity", speaking ? 0.82 : 0.47);
     this.rim.setAttribute("stroke-width", (4 + amp * 7).toFixed(2));
 
-    // The mascot's joy: "^ ^" eyes while it grins.
-    const happy = this.mascot ? Math.max(0, Math.min(1, (this.grin - 0.3) * 2.2)) : 0;
-    if (this.mascot) this.happyEyes.forEach((p) => p.setAttribute("stroke-opacity", happy.toFixed(3)));
+    // The mascot's joy: "^ ^" eyes while it grins, sparkles and popping eyes
+    // while it is excited.
+    const mood = this.moodLeft > 0 ? this.mood : "";
+    let happy = this.mascot ? Math.max(0, Math.min(1, (this.grin - 0.3) * 2.2)) : 0;
+    if (mood === "laugh") happy = 1;
+    if (mood === "wow") happy = 0;
+    // A wink: only the left eye is a happy arc.
+    const eyeHappy = mood === "wink" ? [1, 0] : [happy, happy];
+    const pop = 1 + (this.mascot ? (mood === "wow" ? 0.2 : mood === "focus" ? 0.08 : this.excite * 0.1) : 0);
+    const shut = this.mascot && this.shut ? 1 : 0;
+    // Which eyes are shut: both - or, during a peek, only the left one.
+    const shutEye = [shut, shut && this.peek > 0 ? 0 : shut];
+    if (shut) eyeHappy.fill(0);
+    if (this.mascot) {
+      this.happyEyes.forEach((p, i) => p.setAttribute("stroke-opacity", eyeHappy[i].toFixed(3)));
+      this.closedEyes.forEach((p, i) => p.setAttribute("stroke-opacity", shutEye[i] ? "1" : "0"));
+      this.brows.forEach((b, i) => {
+        const tilt = mood === "wink" && i === 0 ? 6               // the winking side goes down
+          : mood === "search" ? (i === 0 ? -5 : 5)                   // thinking: one brow up
+          : this.shut && this.peek > 0 && i === 1 ? -7 : 0;          // peeking: that brow up
+        // Sad brows: the inner ends go up.
+        const sadTilt = mood === "sad" ? (i === 0 ? -22 : 22) : 0;
+        b.setAttribute("transform", `translate(0 ${(-this.brow * 10 + tilt).toFixed(1)})`
+          + (sadTilt ? ` rotate(${sadTilt} ${i === 0 ? 217 : 283} 165)` : ""));
+      });
+      for (const s of this.sparkles) {
+        const e = Math.max(0, this.excite - 0.08);
+        const twinkle = 0.55 + 0.45 * Math.sin(this.tick * 0.35 + s.phase);
+        const size = s.k * (0.4 + e * 0.9) * twinkle;
+        s.g.setAttribute("opacity", Math.min(1, e * 1.6).toFixed(3));
+        s.g.setAttribute("transform",
+          `translate(${s.x} ${(s.y - e * 10).toFixed(1)}) rotate(${(this.tick * 3 + s.phase * 40) % 360}) scale(${size.toFixed(3)})`);
+      }
+    }
     let openY = thinking ? 0.82 : 1;
     if (speaking) openY = 0.88;
     if (this.muted) openY = 0.45;
+    if (mood === "sad") openY *= 0.8;             // droopy
     openY *= Math.max(0.06, 1 - this.blink);
-    for (const eye of this.eyes) {
-      eye.g.setAttribute("opacity", (1 - happy).toFixed(3));
+    if (this.mascot) {
+      // The tear runs down from the left eye, again and again, while it is sad.
+      const run = (this.tick % 45) / 45;
+      this.tear.setAttribute("opacity", mood === "sad" ? (run < 0.8 ? 0.9 : (1 - run) * 4.5).toFixed(2) : "0");
+      this.tear.setAttribute("transform", `translate(205 ${(222 + run * 26).toFixed(1)}) scale(${(1.3 + run * 0.5).toFixed(2)})`);
+    }
+    for (const [i, eye] of this.eyes.entries()) {
+      eye.g.setAttribute("opacity", (1 - Math.max(eyeHappy[i], shutEye[i])).toFixed(3));
       eye.g.setAttribute("transform",
-        `translate(${eye.cx} 199) scale(1 ${openY.toFixed(3)}) translate(${-eye.cx} -199)`);
+        `translate(${eye.cx} ${EYE_MID}) scale(${pop.toFixed(3)} ${(openY * pop).toFixed(3)}) translate(${-eye.cx} ${-EYE_MID})`);
       const px = eye.px + this.gaze[0];
-      const py = 193 + this.gaze[1];
+      const py = 191 + this.gaze[1];
       eye.pupil.setAttribute("x", px.toFixed(2));
       eye.pupil.setAttribute("y", py.toFixed(2));
-      eye.glint.setAttribute("cx", (px + 14.5).toFixed(2));
-      eye.glint.setAttribute("cy", (py + 5.5).toFixed(2));
+      eye.glint.setAttribute("cx", (px + 17).toFixed(2));
+      eye.glint.setAttribute("cy", (py + 6.5).toFixed(2));
     }
 
     this.dots.forEach((dot, i) => {
@@ -274,7 +381,7 @@ export class TutorFace {
       const lift = Math.max(0, Math.sin(phase * 1.3));
       dot.setAttribute("r", (7 + lift * 4).toFixed(2));
       dot.setAttribute("cy", (86 - lift * 10).toFixed(2));
-      dot.setAttribute("fill-opacity", thinking ? ((70 + lift * 150) / 255).toFixed(3) : 0);
+      dot.setAttribute("fill-opacity", thinking || mood === "search" ? ((70 + lift * 150) / 255).toFixed(3) : 0);
     });
 
 
@@ -283,7 +390,11 @@ export class TutorFace {
     if (open < 0.06) {
       // Closed: a smiling line (flatter when muted or asleep).
       const curve = sad ? 5 : 15;
-      this.mouthEl.setAttribute("d", `M226 ${MOUTH_Y - 1} Q250 ${MOUTH_Y - 1 + curve} 274 ${MOUTH_Y - 1}`);
+      this.mouthEl.setAttribute("d", mood === "sad"
+        ? `M230 ${MOUTH_Y + 6} Q250 ${MOUTH_Y - 6} 270 ${MOUTH_Y + 6}`      // a frown
+        : mood === "search"
+        ? `M236 ${MOUTH_Y + 2} Q250 ${MOUTH_Y + 3} 264 ${MOUTH_Y - 1}`      // a thoughtful "hmm"
+        : `M226 ${MOUTH_Y - 1} Q250 ${MOUTH_Y - 1 + curve} 274 ${MOUTH_Y - 1}`);
       this.mouthEl.setAttribute("fill", "none");
       this.mouthEl.setAttribute("stroke", C.ink);
       this.mouthEl.setAttribute("stroke-width", 5.5);
@@ -291,9 +402,11 @@ export class TutorFace {
     } else {
       // Open: a smile whose corners stay up, shaped by the letter being said.
       const [wf, hf] = this.shape;
-      const w = (40 + open * 12) * (speaking ? wf : 1.05);
-      const h = (7 + open * 26) * (speaking ? 0.55 + 0.45 * Math.max(hf, 0.25) : 1);
-      const round = speaking ? Math.max(0, 1 - wf) * 1.6 : 0;      // o and u: rounder, corners lower
+      const shaped = speaking || mood === "wow";                    // a letter, or a surprised "o"
+      const laughing = mood === "laugh";
+      const w = (40 + open * 12) * (shaped ? wf : laughing ? 1.25 : 1.05);
+      const h = (7 + open * 26) * (shaped ? 0.55 + 0.45 * Math.max(hf, 0.25) : 1);
+      const round = shaped ? Math.max(0, 1 - wf) * 1.6 : 0;        // o and u: rounder, corners lower
       const y0 = MOUTH_Y - 2 + round * 3;
       const l = 250 - w / 2, r = 250 + w / 2;
       const d = `M${l.toFixed(1)} ${y0.toFixed(1)} Q250 ${(y0 + 5 - round * 6).toFixed(1)} ${r.toFixed(1)} ${y0.toFixed(1)} `

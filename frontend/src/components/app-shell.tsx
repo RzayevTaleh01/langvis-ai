@@ -10,10 +10,22 @@ import { useAuth } from "@/components/auth-provider";
 import { LiveProvider, useLive } from "@/components/live-provider";
 import { Header } from "@/components/header";
 import { ContentDialog, KeyDialog } from "@/components/dialogs";
+import { PageGuide } from "@/components/home-guide";
+import { firstName } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 
 const GUEST_PAGES = ["/", "/login/", "/register/"];
 const AUTH_PAGES = ["/login/", "/register/"];
+// The mascot walks beside these pages, after a word about each. Not in a
+// lesson or the Tutor (the tutor is on the board there); the home page and Log
+// in / Sign up have it on their own.
+function guideHello(path: string, name: string): string | null {
+  if (path === "/courses/") return "Here is your course: your progress and every lesson, week by week.";
+  if (path.startsWith("/account/dictionary/")) return "Every word you met is here - use them again!";
+  if (path.startsWith("/account/grammar/")) return "Pick a rule to see your own mistakes.";
+  if (path === "/account/") return name ? `Hi ${name}! Here is how far you've come.` : "Here is how far you've come!";
+  return null;
+}
 
 function normal(path: string): string {
   return path.endsWith("/") ? path : path + "/";
@@ -50,6 +62,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <LiveProvider>
       <Header />
       {children}
+      {guideHello(path, firstName(user)) !== null
+        && <PageGuide key={path} hello={guideHello(path, firstName(user)) || ""} />}
       <div className="chart-tip hidden" id="tooltip" role="status" />
       <KeyDialog />
       <ContentDialog />
